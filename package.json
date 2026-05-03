@@ -1,0 +1,43 @@
+{
+  "name": "com.persistly.sdk.unity",
+  "version": "0.9.0",
+  "displayName": "Persistly Unity SDK",
+  "description": "Unity SDK and playable sample project for the Persistly runtime API.",
+  "license": "Apache-2.0",
+  "unity": "2021.3",
+  "homepage": "https://docs.persistly.app/sdk/unity",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Persistly/persistly-sdk-unity.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Persistly/persistly-sdk-unity/issues"
+  },
+  "author": {
+    "name": "Persistly"
+  },
+  "files": [
+    "Runtime",
+    "contracts",
+    "examples",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE",
+    "SECURITY.md",
+    "package.json"
+  ],
+  "keywords": [
+    "persistly",
+    "sdk",
+    "unity",
+    "save",
+    "runtime"
+  ],
+  "samples": [
+    {
+      "displayName": "Minimal Usage",
+      "description": "Basic create/load/sync usage.",
+      "path": "examples"
+    }
+  ]
+}

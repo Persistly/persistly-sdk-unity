@@ -1,0 +1,12 @@
+Library/
+Temp/
+Obj/
+Logs/
+Build/
+Builds/
+UserSettings/
+*.app/
+TestResults-*.xml
+__pycache__/
+*.pyc
+.DS_Store

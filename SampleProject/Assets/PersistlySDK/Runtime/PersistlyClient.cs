@@ -1,0 +1,558 @@
+#nullable enable
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Threading;
+using System.Threading.Tasks;
+
+namespace Persistly.Unity
+{
+    public sealed class PersistlyClient
+    {
+        private readonly Uri _baseUri;
+        private readonly string _runtimeKey;
+        private readonly IPersistlyTransport _transport;
+        private readonly IPersistlySaveCache _cache;
+        private readonly int _timeoutSeconds;
+        private readonly string _userAgent;
+
+        public PersistlyClient(PersistlyClientOptions options)
+        {
+            if (options == null)
+            {
+                throw new ArgumentNullException(nameof(options));
+            }
+
+            if (string.IsNullOrWhiteSpace(options.BaseUrl))
+            {
+                throw new PersistlyConfigurationError("PersistlyClientOptions.BaseUrl must be set.");
+            }
+
+            if (!Uri.TryCreate(options.BaseUrl.Trim(), UriKind.Absolute, out _baseUri))
+            {
+                throw new PersistlyConfigurationError("PersistlyClientOptions.BaseUrl must be an absolute URL.");
+            }
+
+            if (string.IsNullOrWhiteSpace(options.RuntimeKey))
+            {
+                throw new PersistlyConfigurationError("PersistlyClientOptions.RuntimeKey must be set.");
+            }
+
+            _runtimeKey = options.RuntimeKey.Trim();
+            _transport = options.Transport ?? new UnityWebRequestTransport();
+            _cache = options.Cache ?? new InMemoryPersistlySaveCache();
+            _timeoutSeconds = options.TimeoutSeconds;
+            _userAgent = options.UserAgent;
+        }
+
+        public Task UpdateLocalAsync(PersistlySave save)
+        {
+            if (save == null)
+            {
+                throw new ArgumentNullException(nameof(save));
+            }
+
+            _cache.Store(save);
+            return Task.CompletedTask;
+        }
+
+        public bool TryGetLocal(string saveId, out PersistlySave save)
+        {
+            if (string.IsNullOrWhiteSpace(saveId))
+            {
+                throw new PersistlyConfigurationError("saveId must be set.");
+            }
+
+            return _cache.TryGet(saveId, out save);
+        }
+
+        public Task ClearLocalAsync(string saveId)
+        {
+            if (string.IsNullOrWhiteSpace(saveId))
+            {
+                throw new PersistlyConfigurationError("saveId must be set.");
+            }
+
+            _cache.Clear(saveId);
+            return Task.CompletedTask;
+        }
+
+        public async Task<PersistlySave> CreateSaveAsync(PersistlyCreateSaveRequest request, CancellationToken cancellationToken = default)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            PersistlyJson.ValidatePayloadSizes(request.MetadataJson, request.StateJson);
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/saves",
+                BuildCreateBody(request),
+                cancellationToken);
+
+            var save = ParseSaveEnvelope(response.Body);
+            _cache.Store(save);
+            return save;
+        }
+
+        public async Task<PersistlySave> LoadSaveAsync(string saveId, CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(saveId);
+
+            var response = await SendJsonAsync(
+                "GET",
+                "/api/v1/saves/" + Uri.EscapeDataString(saveId),
+                null,
+                cancellationToken);
+
+            var save = ParseSaveEnvelope(response.Body);
+            _cache.Store(save);
+            return save;
+        }
+
+        public async Task<PersistlySyncResponse> SyncSaveAsync(string saveId, PersistlySyncSaveRequest request, CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(saveId);
+
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            PersistlyJson.ValidatePayloadSizes(request.MetadataJson, request.StateJson);
+
+            var baseVersion = request.BaseVersion;
+            PersistlySave cachedSave;
+            if (!baseVersion.HasValue && _cache.TryGet(saveId, out cachedSave))
+            {
+                baseVersion = cachedSave.Version;
+            }
+
+            if (!baseVersion.HasValue)
+            {
+                throw new PersistlyConfigurationError("SyncSaveAsync requires baseVersion unless the save is already cached.");
+            }
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/saves/" + Uri.EscapeDataString(saveId) + "/sync",
+                BuildSyncBody(request, baseVersion.Value),
+                cancellationToken,
+                acceptConflictStatus: true);
+
+            if (response.StatusCode == 200)
+            {
+                var accepted = ParseAcceptedSyncResponse(response.Body);
+                _cache.Store(accepted.Save);
+                return accepted;
+            }
+
+            if (response.StatusCode == 409)
+            {
+                var conflict = ParseConflictSyncResponse(response.Body);
+                _cache.Store(conflict.Save);
+                return conflict;
+            }
+
+            throw ParseApiError(response.StatusCode, response.Body, response.Error);
+        }
+
+        private async Task<PersistlyTransportResponse> SendJsonAsync(
+            string method,
+            string relativePath,
+            string? body,
+            CancellationToken cancellationToken,
+            bool acceptConflictStatus = false)
+        {
+            var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+            {
+                { "Authorization", "Bearer " + _runtimeKey },
+                { "Content-Type", "application/json" },
+                { "User-Agent", _userAgent }
+            };
+
+            var request = new PersistlyTransportRequest(method, new Uri(_baseUri, relativePath).ToString(), body, _timeoutSeconds, headers);
+            PersistlyTransportResponse response;
+            try
+            {
+                response = await _transport.SendAsync(request, cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                throw new PersistlyTransportError("Persistly request failed before the runtime API responded.", exception);
+            }
+
+            if (response.StatusCode >= 200 && response.StatusCode < 300)
+            {
+                return response;
+            }
+
+            if (acceptConflictStatus && response.StatusCode == 409)
+            {
+                return response;
+            }
+
+            throw ParseApiError(response.StatusCode, response.Body, response.Error);
+        }
+
+        private static string BuildCreateBody(PersistlyCreateSaveRequest request)
+        {
+            var body = "{";
+            if (request.ExternalUserId != null)
+            {
+                body += "\"externalUserId\":" + PersistlyJson.EscapeJsonString(request.ExternalUserId) + ",";
+            }
+
+            if (request.MetadataJson != null)
+            {
+                body += "\"metadata\":" + request.MetadataJson + ",";
+            }
+
+            body += "\"state\":" + request.StateJson;
+            body += "}";
+            return body;
+        }
+
+        private static string BuildSyncBody(PersistlySyncSaveRequest request, int baseVersion)
+        {
+            var body = "{";
+            body += "\"baseVersion\":" + baseVersion.ToString(CultureInfo.InvariantCulture) + ",";
+            if (request.MetadataJson != null)
+            {
+                body += "\"metadata\":" + request.MetadataJson + ",";
+            }
+
+            body += "\"state\":" + request.StateJson;
+            body += "}";
+            return body;
+        }
+
+        private static PersistlySave ParseSaveEnvelope(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "save envelope"), "save envelope");
+            var save = GetRequiredObject(root, "save", "save envelope");
+            return ParseSave(save);
+        }
+
+        private static PersistlySyncResponse ParseAcceptedSyncResponse(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "sync response"), "sync response");
+            var status = GetRequiredString(root, "status", "sync response");
+            if (!string.Equals(status, "accepted", StringComparison.Ordinal))
+            {
+                throw new PersistlyConfigurationError("Accepted sync response had an unexpected status.");
+            }
+
+            var save = GetRequiredObject(root, "save", "sync response");
+            return new PersistlySyncResponse(PersistlySyncStatus.Accepted, ParseSave(save));
+        }
+
+        private static PersistlySyncResponse ParseConflictSyncResponse(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "sync response"), "sync response");
+            var status = GetRequiredString(root, "status", "sync response");
+            if (!string.Equals(status, "conflict", StringComparison.Ordinal))
+            {
+                throw new PersistlyConfigurationError("Conflict sync response had an unexpected status.");
+            }
+
+            var save = GetRequiredObject(root, "save", "sync response");
+            var details = GetRequiredObject(root, "details", "sync response");
+            var reason = GetRequiredString(details, "reason", "sync response details");
+            if (!string.Equals(reason, "base_version_mismatch", StringComparison.Ordinal))
+            {
+                throw new PersistlyConfigurationError("Conflict sync response had an unexpected reason.");
+            }
+
+            return new PersistlySyncResponse(
+                PersistlySyncStatus.Conflict,
+                ParseSave(save),
+                new PersistlySyncConflictDetails(PersistlySyncConflictReason.BaseVersionMismatch));
+        }
+
+        private static PersistlySave ParseSave(Dictionary<string, object?> saveObject)
+        {
+            var saveId = GetRequiredString(saveObject, "saveId", "save");
+            var externalUserId = GetOptionalString(saveObject, "externalUserId");
+            var metadata = GetRequiredObject(saveObject, "metadata", "save");
+            var state = GetRequiredObject(saveObject, "state", "save");
+            var version = GetRequiredInt(saveObject, "version", "save");
+            var createdAt = GetRequiredDateTimeOffset(saveObject, "createdAt", "save");
+            var updatedAt = GetRequiredDateTimeOffset(saveObject, "updatedAt", "save");
+
+            return new PersistlySave(
+                saveId,
+                externalUserId,
+                PersistlyJson.Serialize(metadata),
+                PersistlyJson.Serialize(state),
+                version,
+                createdAt,
+                updatedAt);
+        }
+
+        private static PersistlyApiError ParseApiError(int statusCode, string body, string? transportError)
+        {
+            string? detailsJson = null;
+            string message = transportError ?? DefaultMessageForStatus(statusCode);
+            PersistlyErrorCode code = MapStatusCodeToErrorCode(statusCode);
+
+            if (!string.IsNullOrWhiteSpace(body))
+            {
+                try
+                {
+                    var root = AsObject(PersistlyJson.ParseJsonValue(body, "error response"), "error response");
+                    var error = GetRequiredObject(root, "error", "error response");
+                    var wireCode = GetRequiredString(error, "code", "error response");
+                    message = GetRequiredString(error, "message", "error response");
+                    if (error.ContainsKey("details"))
+                    {
+                        detailsJson = PersistlyJson.Serialize(error["details"]);
+                    }
+
+                    code = ParseWireErrorCode(wireCode);
+
+                    if (code == PersistlyErrorCode.PayloadTooLarge)
+                    {
+                        string? field = null;
+                        int? maxBytes = null;
+                        Dictionary<string, object?> details;
+                        if (TryGetObject(error, "details", out details))
+                        {
+                            field = GetOptionalString(details, "field");
+                            if (details.ContainsKey("maxBytes"))
+                            {
+                                maxBytes = GetOptionalInt(details, "maxBytes");
+                            }
+                        }
+
+                        return new PersistlyPayloadTooLargeError(statusCode, message, field, maxBytes, detailsJson);
+                    }
+                }
+                catch (PersistlyConfigurationError)
+                {
+                    code = MapStatusCodeToErrorCode(statusCode);
+                }
+            }
+
+            switch (code)
+            {
+                case PersistlyErrorCode.InvalidRequest:
+                    return new PersistlyInvalidRequestError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.Unauthorized:
+                    return new PersistlyUnauthorizedError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.NotFound:
+                    return new PersistlyNotFoundError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.Conflict:
+                    return new PersistlyConflictError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.RateLimited:
+                    return new PersistlyRateLimitedError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.PayloadTooLarge:
+                    return new PersistlyPayloadTooLargeError(statusCode, message, null, null, detailsJson);
+                case PersistlyErrorCode.ServerError:
+                default:
+                    return new PersistlyServerError(statusCode, message, detailsJson);
+            }
+        }
+
+        private static PersistlyErrorCode ParseWireErrorCode(string wireCode)
+        {
+            switch (wireCode)
+            {
+                case "invalid_request":
+                    return PersistlyErrorCode.InvalidRequest;
+                case "unauthorized":
+                    return PersistlyErrorCode.Unauthorized;
+                case "not_found":
+                    return PersistlyErrorCode.NotFound;
+                case "conflict":
+                    return PersistlyErrorCode.Conflict;
+                case "rate_limited":
+                    return PersistlyErrorCode.RateLimited;
+                case "payload_too_large":
+                    return PersistlyErrorCode.PayloadTooLarge;
+                case "server_error":
+                    return PersistlyErrorCode.ServerError;
+                default:
+                    throw new PersistlyConfigurationError("Persistly error code was unexpected: " + wireCode);
+            }
+        }
+
+        private static PersistlyErrorCode MapStatusCodeToErrorCode(int statusCode)
+        {
+            if (statusCode == 400 || statusCode == 422)
+            {
+                return PersistlyErrorCode.InvalidRequest;
+            }
+
+            if (statusCode == 401 || statusCode == 403)
+            {
+                return PersistlyErrorCode.Unauthorized;
+            }
+
+            if (statusCode == 404)
+            {
+                return PersistlyErrorCode.NotFound;
+            }
+
+            if (statusCode == 409)
+            {
+                return PersistlyErrorCode.Conflict;
+            }
+
+            if (statusCode == 413)
+            {
+                return PersistlyErrorCode.PayloadTooLarge;
+            }
+
+            if (statusCode == 429)
+            {
+                return PersistlyErrorCode.RateLimited;
+            }
+
+            return PersistlyErrorCode.ServerError;
+        }
+
+        private static string DefaultMessageForStatus(int statusCode)
+        {
+            return "Persistly request failed with HTTP " + statusCode.ToString(CultureInfo.InvariantCulture) + ".";
+        }
+
+        private static void EnsureSaveId(string saveId)
+        {
+            if (string.IsNullOrWhiteSpace(saveId))
+            {
+                throw new PersistlyConfigurationError("saveId must be set.");
+            }
+        }
+
+        private static Dictionary<string, object?> AsObject(object? value, string label)
+        {
+            var dictionary = value as Dictionary<string, object?>;
+            if (dictionary == null)
+            {
+                throw new PersistlyConfigurationError(label + " must be a JSON object.");
+            }
+
+            return dictionary;
+        }
+
+        private static Dictionary<string, object?> GetRequiredObject(Dictionary<string, object?> element, string propertyName, string label)
+        {
+            Dictionary<string, object?> property;
+            if (!TryGetObject(element, propertyName, out property))
+            {
+                throw new PersistlyConfigurationError(label + " is missing required property " + propertyName + ".");
+            }
+
+            return property;
+        }
+
+        private static bool TryGetObject(Dictionary<string, object?> element, string propertyName, out Dictionary<string, object?>? property)
+        {
+            object? raw;
+            if (element.TryGetValue(propertyName, out raw))
+            {
+                var parsed = raw as Dictionary<string, object?>;
+                property = parsed;
+                return parsed != null;
+            }
+
+            property = null;
+            return false;
+        }
+
+        private static string GetRequiredString(Dictionary<string, object?> element, string propertyName, string label)
+        {
+            object? property;
+            if (!element.TryGetValue(propertyName, out property) || !(property is string value) || string.IsNullOrWhiteSpace(value))
+            {
+                throw new PersistlyConfigurationError(label + "." + propertyName + " must be a non-empty string.");
+            }
+
+            return value;
+        }
+
+        private static string? GetOptionalString(Dictionary<string, object?> element, string propertyName)
+        {
+            object? property;
+            if (!element.TryGetValue(propertyName, out property) || property == null)
+            {
+                return null;
+            }
+
+            var value = property as string;
+            if (value == null)
+            {
+                throw new PersistlyConfigurationError(propertyName + " must be a string or null.");
+            }
+
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+
+        private static int GetRequiredInt(Dictionary<string, object?> element, string propertyName, string label)
+        {
+            object? property;
+            if (!element.TryGetValue(propertyName, out property))
+            {
+                throw new PersistlyConfigurationError(label + "." + propertyName + " must be an integer.");
+            }
+
+            return ConvertToInt(property!, label + "." + propertyName);
+        }
+
+        private static int? GetOptionalInt(Dictionary<string, object?> element, string propertyName)
+        {
+            object? property;
+            if (!element.TryGetValue(propertyName, out property) || property == null)
+            {
+                return null;
+            }
+
+            return ConvertToInt(property, propertyName);
+        }
+
+        private static int ConvertToInt(object value, string label)
+        {
+            if (value is long longValue)
+            {
+                return checked((int)longValue);
+            }
+
+            if (value is int intValue)
+            {
+                return intValue;
+            }
+
+            if (value is double doubleValue)
+            {
+                var rounded = Math.Round(doubleValue);
+                if (Math.Abs(doubleValue - rounded) > 0.00001d)
+                {
+                    throw new PersistlyConfigurationError(label + " must be an integer.");
+                }
+
+                return checked((int)rounded);
+            }
+
+            throw new PersistlyConfigurationError(label + " must be an integer.");
+        }
+
+        private static DateTimeOffset GetRequiredDateTimeOffset(Dictionary<string, object?> element, string propertyName, string label)
+        {
+            var raw = GetRequiredString(element, propertyName, label);
+            DateTimeOffset value;
+            if (!DateTimeOffset.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out value))
+            {
+                throw new PersistlyConfigurationError(label + "." + propertyName + " must be an RFC 3339 date-time string.");
+            }
+
+            return value;
+        }
+    }
+}

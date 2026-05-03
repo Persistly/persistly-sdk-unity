@@ -1,0 +1,13 @@
+{
+  "name": "Persistly.Unity.LastBeacon.Tests",
+  "references": [
+    "PersistlySDK.Runtime",
+    "Persistly.Unity.LastBeacon"
+  ],
+  "optionalUnityReferences": [
+    "TestAssemblies"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ]
+}

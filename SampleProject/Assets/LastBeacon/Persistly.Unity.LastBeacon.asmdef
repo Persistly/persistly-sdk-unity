@@ -1,0 +1,6 @@
+{
+  "name": "Persistly.Unity.LastBeacon",
+  "references": [
+    "PersistlySDK.Runtime"
+  ]
+}
