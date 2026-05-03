@@ -34,7 +34,7 @@ In Unity, open Package Manager, choose **Add package from git URL**, paste the U
 
 ## Contract Bundle
 
-This repo pins `persistly-contract-v0.1.0` under `contracts/`.
+This repo pins `persistly-contract-v0.2.0` under `contracts/`.
 The bundle is treated as authoritative for request/response semantics and runtime limits.
 
 ## Runtime Surface

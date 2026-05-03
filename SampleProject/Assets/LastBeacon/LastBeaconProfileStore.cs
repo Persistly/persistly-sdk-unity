@@ -9,7 +9,7 @@ namespace Persistly.Unity.LastBeacon
     {
         public string BaseUrl = "https://api.persistly.app";
         public string RuntimeKey = string.Empty;
-        public string ExternalUserId = string.Empty;
+        public string PlayerRef = string.Empty;
         public string CharacterName = "Ayla";
         public string SlotLabel = "Beacon-A";
     }

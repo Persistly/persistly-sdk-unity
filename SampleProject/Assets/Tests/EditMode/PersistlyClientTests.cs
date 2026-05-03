@@ -11,10 +11,10 @@ namespace Persistly.Unity.LastBeacon.Tests
         [Test]
         public async Task CreateSaveStoresCanonicalPayloadInCache()
         {
-            var transport = new StubTransport(201, "{\"save\":{\"saveId\":\"sv_01\",\"externalUserId\":\"auth0|player\",\"metadata\":{\"characterName\":\"Ayla\"},\"state\":{\"Scrap\":12,\"Workers\":1},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"}}");
+            var transport = new StubTransport(201, "{\"save\":{\"saveId\":\"sv_01\",\"playerRef\":\"player-184\",\"metadata\":{\"characterName\":\"Ayla\"},\"state\":{\"Scrap\":12,\"Workers\":1},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"}}");
             var client = BuildClient(transport);
 
-            var created = await client.CreateSaveAsync(new PersistlyCreateSaveRequest("{\"Scrap\":12,\"Workers\":1}", "{\"characterName\":\"Ayla\"}", "auth0|player"));
+            var created = await client.CreateSaveAsync(new PersistlyCreateSaveRequest("{\"Scrap\":12,\"Workers\":1}", "{\"characterName\":\"Ayla\"}", "player-184"));
 
             Assert.That(created.SaveId, Is.EqualTo("sv_01"));
             Assert.That(created.Version, Is.EqualTo(1));
@@ -28,7 +28,7 @@ namespace Persistly.Unity.LastBeacon.Tests
         {
             var transport = new StubTransport(
                 409,
-                "{\"status\":\"conflict\",\"save\":{\"saveId\":\"sv_01\",\"externalUserId\":\"auth0|player\",\"metadata\":{\"characterName\":\"Ayla\"},\"state\":{\"Scrap\":77,\"Workers\":3},\"version\":5,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:05:00Z\"},\"details\":{\"reason\":\"base_version_mismatch\"}}");
+                "{\"status\":\"conflict\",\"save\":{\"saveId\":\"sv_01\",\"playerRef\":\"player-184\",\"metadata\":{\"characterName\":\"Ayla\"},\"state\":{\"Scrap\":77,\"Workers\":3},\"version\":5,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:05:00Z\"},\"details\":{\"reason\":\"base_version_mismatch\"}}");
             var client = BuildClient(transport);
 
             var result = await client.SyncSaveAsync("sv_01", new PersistlySyncSaveRequest("{\"Scrap\":14}", 4, "{\"characterName\":\"Ayla\"}"));

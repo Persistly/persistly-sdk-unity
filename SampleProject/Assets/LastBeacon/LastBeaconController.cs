@@ -109,7 +109,7 @@ namespace Persistly.Unity.LastBeacon
             GUILayout.Label("Persistly Connection", SectionStyle());
             _profile.Config.BaseUrl = DrawField("API Base URL", _profile.Config.BaseUrl);
             _profile.Config.RuntimeKey = DrawField("Runtime Key", _profile.Config.RuntimeKey);
-            _profile.Config.ExternalUserId = DrawField("External User ID", _profile.Config.ExternalUserId);
+            _profile.Config.PlayerRef = DrawField("Player reference", _profile.Config.PlayerRef);
             _profile.Config.CharacterName = DrawField("Character Name", _profile.Config.CharacterName);
             _profile.Config.SlotLabel = DrawField("Slot Label", _profile.Config.SlotLabel);
             GUILayout.Label("Persistent path: " + Application.persistentDataPath);
@@ -233,7 +233,7 @@ namespace Persistly.Unity.LastBeacon
             var created = await client.CreateSaveAsync(new PersistlyCreateSaveRequest(
                 JsonUtility.ToJson(_state.ToSaveState()),
                 JsonUtility.ToJson(BuildMetadata()),
-                NormalizeOptional(_profile.Config.ExternalUserId)));
+                NormalizeOptional(_profile.Config.PlayerRef)));
 
             ApplyCanonicalSave(created, "Created new Persistly save.");
             _connected = true;

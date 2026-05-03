@@ -1,6 +1,6 @@
 {
   "name": "com.persistly.sdk.unity",
-  "version": "0.9.0",
+  "version": "0.9.1",
   "displayName": "Persistly Unity SDK",
   "description": "Unity SDK and playable sample project for the Persistly runtime API.",
   "license": "Apache-2.0",

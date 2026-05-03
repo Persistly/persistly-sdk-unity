@@ -25,7 +25,7 @@ namespace Persistly.Unity.Examples
             var createRequest = new PersistlyCreateSaveRequest(
                 "{\"gold\":100,\"level\":1}",
                 "{\"characterName\":\"Ayla\",\"slot\":2}",
-                "auth0|123");
+                "player-184");
 
             PersistlySave save = await client.CreateSaveAsync(createRequest);
             Debug.Log("Created save " + save.SaveId + " version " + save.Version);

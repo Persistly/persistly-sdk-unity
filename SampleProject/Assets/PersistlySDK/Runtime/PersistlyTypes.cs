@@ -28,19 +28,19 @@ namespace Persistly.Unity
 
         public int TimeoutSeconds { get; set; } = 30;
 
-        public string UserAgent { get; set; } = "Persistly Unity SDK/0.9.0";
+        public string UserAgent { get; set; } = "Persistly Unity SDK/0.9.1";
     }
 
     public sealed class PersistlyCreateSaveRequest
     {
-        public PersistlyCreateSaveRequest(string stateJson, string? metadataJson = null, string? externalUserId = null)
+        public PersistlyCreateSaveRequest(string stateJson, string? metadataJson = null, string? playerRef = null)
         {
             StateJson = PersistlyJson.CanonicalizeObjectJson(stateJson, "state");
             MetadataJson = metadataJson == null ? null : PersistlyJson.CanonicalizeObjectJson(metadataJson, "metadata");
-            ExternalUserId = string.IsNullOrWhiteSpace(externalUserId) ? null : externalUserId.Trim();
+            PlayerRef = string.IsNullOrWhiteSpace(playerRef) ? null : playerRef.Trim();
         }
 
-        public string? ExternalUserId { get; }
+        public string? PlayerRef { get; }
 
         public string? MetadataJson { get; }
 
@@ -67,7 +67,7 @@ namespace Persistly.Unity
     {
         public PersistlySave(
             string saveId,
-            string? externalUserId,
+            string? playerRef,
             string metadataJson,
             string stateJson,
             int version,
@@ -75,7 +75,7 @@ namespace Persistly.Unity
             DateTimeOffset updatedAt)
         {
             SaveId = saveId;
-            ExternalUserId = externalUserId;
+            PlayerRef = playerRef;
             MetadataJson = metadataJson;
             StateJson = stateJson;
             Version = version;
@@ -85,7 +85,7 @@ namespace Persistly.Unity
 
         public string SaveId { get; }
 
-        public string? ExternalUserId { get; }
+        public string? PlayerRef { get; }
 
         public string MetadataJson { get; }
 

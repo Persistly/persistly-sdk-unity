@@ -204,9 +204,9 @@ namespace Persistly.Unity
         private static string BuildCreateBody(PersistlyCreateSaveRequest request)
         {
             var body = "{";
-            if (request.ExternalUserId != null)
+            if (request.PlayerRef != null)
             {
-                body += "\"externalUserId\":" + PersistlyJson.EscapeJsonString(request.ExternalUserId) + ",";
+                body += "\"playerRef\":" + PersistlyJson.EscapeJsonString(request.PlayerRef) + ",";
             }
 
             if (request.MetadataJson != null)
@@ -279,7 +279,7 @@ namespace Persistly.Unity
         private static PersistlySave ParseSave(Dictionary<string, object?> saveObject)
         {
             var saveId = GetRequiredString(saveObject, "saveId", "save");
-            var externalUserId = GetOptionalString(saveObject, "externalUserId");
+            var playerRef = GetOptionalString(saveObject, "playerRef");
             var metadata = GetRequiredObject(saveObject, "metadata", "save");
             var state = GetRequiredObject(saveObject, "state", "save");
             var version = GetRequiredInt(saveObject, "version", "save");
@@ -288,7 +288,7 @@ namespace Persistly.Unity
 
             return new PersistlySave(
                 saveId,
-                externalUserId,
+                playerRef,
                 PersistlyJson.Serialize(metadata),
                 PersistlyJson.Serialize(state),
                 version,
