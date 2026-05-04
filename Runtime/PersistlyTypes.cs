@@ -63,6 +63,50 @@ namespace Persistly.Unity
         public string StateJson { get; }
     }
 
+    public sealed class PersistlyCreateProfileRequest
+    {
+        public PersistlyCreateProfileRequest(
+            string accountDataJson,
+            string characterMetadataJson,
+            string characterStateJson,
+            string? profileMetadataJson = null,
+            string? playerRef = null,
+            string? externalProfileRefJson = null)
+        {
+            AccountDataJson = PersistlyJson.CanonicalizeObjectJson(accountDataJson, "accountData");
+            CharacterMetadataJson = PersistlyJson.CanonicalizeObjectJson(characterMetadataJson, "characterMetadata");
+            CharacterStateJson = PersistlyJson.CanonicalizeObjectJson(characterStateJson, "characterState");
+            ProfileMetadataJson = profileMetadataJson == null ? null : PersistlyJson.CanonicalizeObjectJson(profileMetadataJson, "profileMetadata");
+            PlayerRef = string.IsNullOrWhiteSpace(playerRef) ? null : playerRef.Trim();
+            ExternalProfileRefJson = externalProfileRefJson == null ? null : PersistlyJson.CanonicalizeObjectJson(externalProfileRefJson, "externalProfileRef");
+        }
+
+        public string AccountDataJson { get; }
+
+        public string CharacterMetadataJson { get; }
+
+        public string CharacterStateJson { get; }
+
+        public string? ProfileMetadataJson { get; }
+
+        public string? PlayerRef { get; }
+
+        public string? ExternalProfileRefJson { get; }
+    }
+
+    public sealed class PersistlyCreateProfileCharacterRequest
+    {
+        public PersistlyCreateProfileCharacterRequest(string characterMetadataJson, string characterStateJson)
+        {
+            CharacterMetadataJson = PersistlyJson.CanonicalizeObjectJson(characterMetadataJson, "characterMetadata");
+            CharacterStateJson = PersistlyJson.CanonicalizeObjectJson(characterStateJson, "characterState");
+        }
+
+        public string CharacterMetadataJson { get; }
+
+        public string CharacterStateJson { get; }
+    }
+
     public sealed class PersistlySave
     {
         public PersistlySave(
@@ -106,6 +150,90 @@ namespace Persistly.Unity
         }
 
         public PersistlySave Save { get; }
+    }
+
+    public sealed class PersistlyProfileEnvelope
+    {
+        public PersistlyProfileEnvelope(string profileSaveId, string profileSessionToken, PersistlySave save)
+        {
+            ProfileSaveId = profileSaveId;
+            ProfileSessionToken = profileSessionToken;
+            Save = save;
+        }
+
+        public string ProfileSaveId { get; }
+
+        public string ProfileSessionToken { get; }
+
+        public PersistlySave Save { get; }
+    }
+
+    public sealed class PersistlyCharacterEnvelope
+    {
+        public PersistlyCharacterEnvelope(PersistlySave save)
+        {
+            Save = save;
+        }
+
+        public PersistlySave Save { get; }
+    }
+
+    public sealed class PersistlyCreateProfileResponse
+    {
+        public PersistlyCreateProfileResponse(PersistlyProfileEnvelope profile, PersistlyCharacterEnvelope character)
+        {
+            Profile = profile;
+            Character = character;
+        }
+
+        public PersistlyProfileEnvelope Profile { get; }
+
+        public PersistlyCharacterEnvelope Character { get; }
+
+        public string ProfileSaveId => Profile.ProfileSaveId;
+
+        public string ProfileSessionToken => Profile.ProfileSessionToken;
+    }
+
+    public sealed class PersistlySyncPolicy
+    {
+        public PersistlySyncPolicy(
+            int minRemoteSyncIntervalSeconds,
+            int forceSyncCooldownSeconds,
+            bool syncOnBackground,
+            bool syncOnForeground,
+            bool syncOnReconnect,
+            int maxQueuedLocalSnapshots)
+        {
+            MinRemoteSyncIntervalSeconds = minRemoteSyncIntervalSeconds;
+            ForceSyncCooldownSeconds = forceSyncCooldownSeconds;
+            SyncOnBackground = syncOnBackground;
+            SyncOnForeground = syncOnForeground;
+            SyncOnReconnect = syncOnReconnect;
+            MaxQueuedLocalSnapshots = maxQueuedLocalSnapshots;
+        }
+
+        public int MinRemoteSyncIntervalSeconds { get; }
+
+        public int ForceSyncCooldownSeconds { get; }
+
+        public bool SyncOnBackground { get; }
+
+        public bool SyncOnForeground { get; }
+
+        public bool SyncOnReconnect { get; }
+
+        public int MaxQueuedLocalSnapshots { get; }
+    }
+
+    public sealed class PersistlyRuntimeConfig
+    {
+        public PersistlyRuntimeConfig(PersistlySyncPolicy syncPolicy)
+        {
+            SyncPolicy = syncPolicy;
+        }
+
+        public PersistlySyncPolicy SyncPolicy { get; }
     }
 
     public enum PersistlySyncStatus

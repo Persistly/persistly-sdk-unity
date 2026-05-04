@@ -1,19 +1,15 @@
 # Persistly Unity SDK
 
-Unity runtime SDK for the Persistly runtime API, plus a playable `Last Beacon` sample project.
+Unity runtime SDK for Persistly profile saves, profile sessions, character save-sync, and local autosave support.
 
-This repository includes:
+Persistly is a lightweight cloud save backend for games. The recommended Unity flow is:
 
-- a real Unity-compatible runtime SDK
-- a generated Unity sample project under `SampleProject/`
-- editor-validated create/load/sync behavior
-- edit-mode tests for the SDK, local profile store, and idle-game state loop
+1. Create a profile with the first character.
+2. Persist `profileSaveId`, `profileSessionToken`, and character `saveId` locally.
+3. Load and sync characters through the profile session.
+4. Keep gameplay state local first, then sync remotely at safe intervals or on explicit player action.
 
-The runtime surface stays intentionally small:
-
-- create save
-- load save by `saveId`
-- sync save by `saveId`
+Raw create/load/sync save calls remain available for advanced migrations, but new games should start with profile sessions.
 
 ## Install
 
@@ -23,41 +19,84 @@ Add the package from the public Persistly Unity repository:
 https://github.com/Persistly/persistly-sdk-unity.git?path=/
 ```
 
-In Unity, open Package Manager, choose **Add package from git URL**, paste the URL, then configure your runtime key in game code or the Unity inspector.
+In Unity, open Package Manager, choose **Add package from git URL**, paste the URL, then configure a `ps_test_...` or `ps_live_...` runtime key in your game code or inspector.
 
 ## Quickstart
 
-1. Use a `ps_test_...` key for non-production environments.
-2. Create a save once and persist the returned `saveId` locally.
-3. Load and sync only by `saveId`.
-4. Handle conflict responses explicitly instead of assuming silent last-write wins.
+```csharp
+using Persistly.Unity;
 
-## Contract Bundle
+var client = new PersistlyClient(new PersistlyClientOptions("ps_test_..."));
 
-This repo pins `persistly-contract-v0.2.0` under `contracts/`.
-The bundle is treated as authoritative for request/response semantics and runtime limits.
+var created = await client.CreateProfileAsync(new PersistlyCreateProfileRequest(
+    accountDataJson: "{\"diamonds\":20}",
+    characterMetadataJson: "{\"characterName\":\"Ayla\",\"slot\":1}",
+    characterStateJson: "{\"gold\":100,\"level\":1}",
+    profileMetadataJson: "{\"displayName\":\"Ayla\"}",
+    playerRef: "player-184"));
+
+// Store these locally. They are the resume material for this player/profile.
+var profileSaveId = created.ProfileSaveId;
+var profileSessionToken = created.ProfileSessionToken;
+var characterSaveId = created.Character.Save.SaveId;
+
+var loaded = await client.LoadProfileCharacterAsync(
+    profileSaveId,
+    profileSessionToken,
+    characterSaveId);
+
+var result = await client.SyncProfileCharacterAsync(
+    profileSaveId,
+    profileSessionToken,
+    characterSaveId,
+    new PersistlySyncSaveRequest(
+        stateJson: "{\"gold\":120,\"level\":2}",
+        baseVersion: loaded.Version,
+        metadataJson: "{\"characterName\":\"Ayla\",\"slot\":1}"));
+
+if (result.Status == PersistlySyncStatus.Conflict)
+{
+    // result.Save is the canonical server character save. Reconcile intentionally.
+}
+```
 
 ## Runtime Surface
 
 The package includes:
 
 - `PersistlyClient`
-- request and response DTOs for create/load/sync
-- typed runtime API error classes
-- in-memory save cache
-- UnityWebRequest transport abstraction
+- `CreateProfileAsync`, `LoadProfileAsync`, `CreateProfileCharacterAsync`, `LoadProfileCharacterAsync`, and `SyncProfileCharacterAsync`
+- advanced raw `CreateSaveAsync`, `LoadSaveAsync`, and `SyncSaveAsync`
+- `GetRuntimeConfigAsync` for server-provided sync policy
+- typed runtime errors, including forbidden profile-session failures
+- `InMemoryPersistlySaveCache`
+- `InMemoryPersistlyAutosaveDraftStore`
+- `FilePersistlyAutosaveDraftStore`
+- `PersistlyAutosaveManager`
+- `UnityWebRequestTransport`
 - Unity-safe JSON parsing and serialization without `System.Text.Json`
 
-## Payload Shape
+## Profile Sessions
 
-To stay explicit and Unity-friendly, request payloads use JSON object strings for `metadata` and `state`.
-Responses expose canonical payloads as raw JSON strings for `metadata` and `state`, so game code can feed them into `JsonUtility` or its own serializers without extra glue code.
+Profile endpoints require `profileSessionToken`. The SDK sends it as `X-Persistly-Profile-Session` for profile and character routes.
 
-## Cache Behavior
+`playerRef` and `externalProfileRefJson` are optional developer references. `externalProfileRefJson` must be a JSON object such as `{"provider":"auth0","subject":"auth0|user_123"}`. These references are not authentication tokens, not ownership proof, and not public lookup APIs. Store `profileSaveId` and `profileSessionToken` locally or in your own trusted backend.
 
-- `InMemoryPersistlySaveCache` stores canonical saves in memory
-- `PersistlyClient` stores saves returned from create/load/sync into the configured cache
-- `SyncSaveAsync` can infer `baseVersion` from cache when the caller omits it
+## Autosave
+
+`PersistlyAutosaveManager` lets games write every state change to local storage while respecting Persistly remote-sync policy:
+
+- local changes are stored immediately
+- remote sync can be throttled by `minRemoteSyncIntervalSeconds`
+- explicit sync buttons can use force sync and honor `forceSyncCooldownSeconds`
+- if the game closes before remote sync, the local draft is still available
+
+Use `FilePersistlyAutosaveDraftStore` with `Application.persistentDataPath` for real players and `InMemoryPersistlyAutosaveDraftStore` for tests.
+
+## Contract Bundle
+
+This repo pins `persistly-contract-v0.2.0` under `contracts/`.
+The bundle is authoritative for request/response semantics, routes, and runtime limits.
 
 ## Validation
 
@@ -67,13 +106,7 @@ Run the local bundle check from the repo root:
 python3 Scripts/validate_contract.py
 ```
 
-The script verifies:
-
-- the pinned manifest exists
-- the expected bundle layout exists
-- file sizes and SHA-256 checksums match the pinned manifest
-
-Run the real Unity validation suite:
+Run the Unity edit-mode suite:
 
 ```bash
 UNITY_BIN="/Applications/Unity/Unity-6000.4.2f1/Unity.app/Contents/MacOS/Unity"
@@ -85,26 +118,9 @@ UNITY_BIN="/Applications/Unity/Unity-6000.4.2f1/Unity.app/Contents/MacOS/Unity"
   -logFile -
 ```
 
-Generate the sample scene if needed:
+## Examples
 
-```bash
-UNITY_BIN="/Applications/Unity/Unity-6000.4.2f1/Unity.app/Contents/MacOS/Unity"
-"$UNITY_BIN" \
-  -batchmode \
-  -projectPath "$(pwd)/SampleProject" \
-  -executeMethod LastBeaconSceneBuilder.BuildSceneBatchMode \
-  -logFile -
-```
-
-## Production Runtime Origin
-
-The SDK targets `https://api.persistly.app` by default. Reserve custom origins for explicit validation infrastructure only.
-
-## Example
-
-See:
-
-- `examples/MinimalUsage.cs` for a minimal SDK snippet
+- `examples/MinimalUsage.cs` for a minimal profile/session snippet
 - `SampleProject/Assets/LastBeacon/` for the playable endless-idle sample
 - `SampleProject/Assets/Scenes/LastBeacon.unity` for the generated demo scene
 

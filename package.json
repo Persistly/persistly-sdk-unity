@@ -2,7 +2,7 @@
   "name": "com.persistly.sdk.unity",
   "version": "0.9.1",
   "displayName": "Persistly Unity SDK",
-  "description": "Unity SDK and playable sample project for the Persistly runtime API.",
+  "description": "Unity SDK and playable sample project for Persistly profile saves, sessions, and character sync.",
   "license": "Apache-2.0",
   "unity": "2021.3",
   "homepage": "https://docs.persistly.app/sdk/unity",
@@ -31,6 +31,8 @@
     "sdk",
     "unity",
     "save",
+    "profile",
+    "session",
     "runtime"
   ],
   "samples": [

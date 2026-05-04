@@ -18,7 +18,9 @@ namespace Persistly.Unity.LastBeacon
     public sealed class LastBeaconProfile
     {
         public LastBeaconConfig Config = new LastBeaconConfig();
-        public string SaveId = string.Empty;
+        public string ProfileSaveId = string.Empty;
+        public string ProfileSessionToken = string.Empty;
+        public string CharacterSaveId = string.Empty;
         public int Version = 0;
         public LastBeaconSaveState State = new LastBeaconSaveState();
     }

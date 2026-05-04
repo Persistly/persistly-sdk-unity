@@ -21,24 +21,32 @@ namespace Persistly.Unity.Examples
 
         private async void Start()
         {
-            // Replace the JSON strings with your own state and metadata payloads.
-            var createRequest = new PersistlyCreateSaveRequest(
-                "{\"gold\":100,\"level\":1}",
+            var createRequest = new PersistlyCreateProfileRequest(
+                "{\"diamonds\":20}",
                 "{\"characterName\":\"Ayla\",\"slot\":2}",
+                "{\"gold\":100,\"level\":1}",
+                "{\"displayName\":\"Ayla\"}",
                 "player-184");
 
-            PersistlySave save = await client.CreateSaveAsync(createRequest);
-            Debug.Log("Created save " + save.SaveId + " version " + save.Version);
+            PersistlyCreateProfileResponse created = await client.CreateProfileAsync(createRequest);
+            Debug.Log("Created profile " + created.ProfileSaveId + " with character " + created.Character.Save.SaveId);
 
-            PersistlySave loaded = await client.LoadSaveAsync(save.SaveId);
-            Debug.Log("Loaded save " + loaded.SaveId + " at " + loaded.UpdatedAt.ToString("O"));
+            PersistlySave loaded = await client.LoadProfileCharacterAsync(
+                created.ProfileSaveId,
+                created.ProfileSessionToken,
+                created.Character.Save.SaveId);
+            Debug.Log("Loaded character " + loaded.SaveId + " at " + loaded.UpdatedAt.ToString("O"));
 
             var syncRequest = new PersistlySyncSaveRequest(
                 "{\"gold\":120,\"level\":2}",
                 loaded.Version,
                 "{\"characterName\":\"Ayla\",\"slot\":2}");
 
-            PersistlySyncResponse sync = await client.SyncSaveAsync(save.SaveId, syncRequest);
+            PersistlySyncResponse sync = await client.SyncProfileCharacterAsync(
+                created.ProfileSaveId,
+                created.ProfileSessionToken,
+                created.Character.Save.SaveId,
+                syncRequest);
             Debug.Log("Sync status: " + sync.Status.ToString());
         }
     }

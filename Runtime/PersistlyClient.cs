@@ -97,6 +97,156 @@ namespace Persistly.Unity
             return save;
         }
 
+        public async Task<PersistlyCreateProfileResponse> CreateProfileAsync(PersistlyCreateProfileRequest request, CancellationToken cancellationToken = default)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            PersistlyJson.ValidatePayloadSizes(request.ProfileMetadataJson, request.AccountDataJson);
+            PersistlyJson.ValidatePayloadSizes(request.CharacterMetadataJson, request.CharacterStateJson);
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/profiles",
+                BuildCreateProfileBody(request),
+                cancellationToken);
+
+            var created = ParseCreateProfileResponse(response.Body);
+            _cache.Store(created.Profile.Save);
+            _cache.Store(created.Character.Save);
+            return created;
+        }
+
+        public async Task<PersistlyProfileEnvelope> LoadProfileAsync(string profileSaveId, string profileSessionToken, CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(profileSaveId);
+            EnsureSessionToken(profileSessionToken);
+
+            var response = await SendJsonAsync(
+                "GET",
+                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId),
+                null,
+                cancellationToken,
+                profileSessionToken: profileSessionToken);
+
+            var profile = ParseProfileEnvelope(response.Body);
+            _cache.Store(profile.Save);
+            return profile;
+        }
+
+        public async Task<PersistlyCharacterEnvelope> CreateProfileCharacterAsync(
+            string profileSaveId,
+            string profileSessionToken,
+            PersistlyCreateProfileCharacterRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(profileSaveId);
+            EnsureSessionToken(profileSessionToken);
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            PersistlyJson.ValidatePayloadSizes(request.CharacterMetadataJson, request.CharacterStateJson);
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters",
+                BuildCreateProfileCharacterBody(request),
+                cancellationToken,
+                profileSessionToken: profileSessionToken);
+
+            var character = ParseCharacterEnvelope(response.Body);
+            _cache.Store(character.Save);
+            return character;
+        }
+
+        public async Task<PersistlySave> LoadProfileCharacterAsync(string profileSaveId, string profileSessionToken, string characterSaveId, CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(profileSaveId);
+            EnsureSaveId(characterSaveId);
+            EnsureSessionToken(profileSessionToken);
+
+            var response = await SendJsonAsync(
+                "GET",
+                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters/" + Uri.EscapeDataString(characterSaveId),
+                null,
+                cancellationToken,
+                profileSessionToken: profileSessionToken);
+
+            var save = ParseSaveEnvelope(response.Body);
+            _cache.Store(save);
+            return save;
+        }
+
+        public async Task<PersistlySyncResponse> SyncProfileCharacterAsync(
+            string profileSaveId,
+            string profileSessionToken,
+            string characterSaveId,
+            PersistlySyncSaveRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(profileSaveId);
+            EnsureSaveId(characterSaveId);
+            EnsureSessionToken(profileSessionToken);
+
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            PersistlyJson.ValidatePayloadSizes(request.MetadataJson, request.StateJson);
+
+            var baseVersion = request.BaseVersion;
+            PersistlySave cachedSave;
+            if (!baseVersion.HasValue && _cache.TryGet(characterSaveId, out cachedSave))
+            {
+                baseVersion = cachedSave.Version;
+            }
+
+            if (!baseVersion.HasValue)
+            {
+                throw new PersistlyConfigurationError("SyncProfileCharacterAsync requires baseVersion unless the character save is already cached.");
+            }
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters/" + Uri.EscapeDataString(characterSaveId) + "/sync",
+                BuildSyncBody(request, baseVersion.Value),
+                cancellationToken,
+                acceptConflictStatus: true,
+                profileSessionToken: profileSessionToken);
+
+            if (response.StatusCode == 200)
+            {
+                var accepted = ParseAcceptedSyncResponse(response.Body);
+                _cache.Store(accepted.Save);
+                return accepted;
+            }
+
+            if (response.StatusCode == 409)
+            {
+                var conflict = ParseConflictSyncResponse(response.Body);
+                _cache.Store(conflict.Save);
+                return conflict;
+            }
+
+            throw ParseApiError(response.StatusCode, response.Body, response.Error);
+        }
+
+        public async Task<PersistlyRuntimeConfig> GetRuntimeConfigAsync(CancellationToken cancellationToken = default)
+        {
+            var response = await SendJsonAsync(
+                "GET",
+                "/api/v1/runtime-config",
+                null,
+                cancellationToken);
+
+            return ParseRuntimeConfig(response.Body);
+        }
+
         public async Task<PersistlySave> LoadSaveAsync(string saveId, CancellationToken cancellationToken = default)
         {
             EnsureSaveId(saveId);
@@ -164,7 +314,8 @@ namespace Persistly.Unity
             string relativePath,
             string? body,
             CancellationToken cancellationToken,
-            bool acceptConflictStatus = false)
+            bool acceptConflictStatus = false,
+            string? profileSessionToken = null)
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -172,6 +323,10 @@ namespace Persistly.Unity
                 { "Content-Type", "application/json" },
                 { "User-Agent", _userAgent }
             };
+            if (!string.IsNullOrWhiteSpace(profileSessionToken))
+            {
+                headers["X-Persistly-Profile-Session"] = profileSessionToken.Trim();
+            }
 
             var request = new PersistlyTransportRequest(method, new Uri(_baseUri, relativePath).ToString(), body, _timeoutSeconds, headers);
             PersistlyTransportResponse response;
@@ -233,11 +388,93 @@ namespace Persistly.Unity
             return body;
         }
 
+        private static string BuildCreateProfileBody(PersistlyCreateProfileRequest request)
+        {
+            var body = "{";
+            if (request.PlayerRef != null)
+            {
+                body += "\"playerRef\":" + PersistlyJson.EscapeJsonString(request.PlayerRef) + ",";
+            }
+
+            if (request.ExternalProfileRefJson != null)
+            {
+                body += "\"externalProfileRef\":" + request.ExternalProfileRefJson + ",";
+            }
+
+            if (request.ProfileMetadataJson != null)
+            {
+                body += "\"profileMetadata\":" + request.ProfileMetadataJson + ",";
+            }
+
+            body += "\"accountData\":" + request.AccountDataJson + ",";
+            body += "\"characterMetadata\":" + request.CharacterMetadataJson + ",";
+            body += "\"characterState\":" + request.CharacterStateJson;
+            body += "}";
+            return body;
+        }
+
+        private static string BuildCreateProfileCharacterBody(PersistlyCreateProfileCharacterRequest request)
+        {
+            return "{" +
+                "\"characterMetadata\":" + request.CharacterMetadataJson + "," +
+                "\"characterState\":" + request.CharacterStateJson +
+                "}";
+        }
+
         private static PersistlySave ParseSaveEnvelope(string body)
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "save envelope"), "save envelope");
             var save = GetRequiredObject(root, "save", "save envelope");
             return ParseSave(save);
+        }
+
+        private static PersistlyCreateProfileResponse ParseCreateProfileResponse(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "create profile response"), "create profile response");
+            var profileRoot = GetRequiredObject(root, "profile", "create profile response");
+            var characterRoot = GetRequiredObject(root, "character", "create profile response");
+            return new PersistlyCreateProfileResponse(ParseProfileEnvelope(profileRoot), ParseCharacterEnvelope(characterRoot));
+        }
+
+        private static PersistlyProfileEnvelope ParseProfileEnvelope(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "profile envelope"), "profile envelope");
+            var profileRoot = root.ContainsKey("profile") ? GetRequiredObject(root, "profile", "profile envelope") : root;
+            return ParseProfileEnvelope(profileRoot);
+        }
+
+        private static PersistlyProfileEnvelope ParseProfileEnvelope(Dictionary<string, object?> profileRoot)
+        {
+            var profileSaveId = GetRequiredString(profileRoot, "profileSaveId", "profile envelope");
+            var profileSessionToken = GetRequiredString(profileRoot, "profileSessionToken", "profile envelope");
+            var save = GetRequiredObject(profileRoot, "save", "profile envelope");
+            return new PersistlyProfileEnvelope(profileSaveId, profileSessionToken, ParseSave(save));
+        }
+
+        private static PersistlyCharacterEnvelope ParseCharacterEnvelope(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "character envelope"), "character envelope");
+            var characterRoot = root.ContainsKey("character") ? GetRequiredObject(root, "character", "character envelope") : root;
+            return ParseCharacterEnvelope(characterRoot);
+        }
+
+        private static PersistlyCharacterEnvelope ParseCharacterEnvelope(Dictionary<string, object?> characterRoot)
+        {
+            var save = GetRequiredObject(characterRoot, "save", "character envelope");
+            return new PersistlyCharacterEnvelope(ParseSave(save));
+        }
+
+        private static PersistlyRuntimeConfig ParseRuntimeConfig(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "runtime config"), "runtime config");
+            var policy = GetRequiredObject(root, "syncPolicy", "runtime config");
+            return new PersistlyRuntimeConfig(new PersistlySyncPolicy(
+                GetRequiredInt(policy, "minRemoteSyncIntervalSeconds", "syncPolicy"),
+                GetRequiredInt(policy, "forceSyncCooldownSeconds", "syncPolicy"),
+                GetRequiredBool(policy, "syncOnBackground", "syncPolicy"),
+                GetRequiredBool(policy, "syncOnForeground", "syncPolicy"),
+                GetRequiredBool(policy, "syncOnReconnect", "syncPolicy"),
+                GetRequiredInt(policy, "maxQueuedLocalSnapshots", "syncPolicy")));
         }
 
         private static PersistlySyncResponse ParseAcceptedSyncResponse(string body)
@@ -321,8 +558,8 @@ namespace Persistly.Unity
                     {
                         string? field = null;
                         int? maxBytes = null;
-                        Dictionary<string, object?> details;
-                        if (TryGetObject(error, "details", out details))
+                        Dictionary<string, object?>? details;
+                        if (TryGetObject(error, "details", out details) && details != null)
                         {
                             field = GetOptionalString(details, "field");
                             if (details.ContainsKey("maxBytes"))
@@ -346,6 +583,8 @@ namespace Persistly.Unity
                     return new PersistlyInvalidRequestError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.Unauthorized:
                     return new PersistlyUnauthorizedError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.Forbidden:
+                    return new PersistlyForbiddenError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.NotFound:
                     return new PersistlyNotFoundError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.Conflict:
@@ -368,6 +607,8 @@ namespace Persistly.Unity
                     return PersistlyErrorCode.InvalidRequest;
                 case "unauthorized":
                     return PersistlyErrorCode.Unauthorized;
+                case "forbidden":
+                    return PersistlyErrorCode.Forbidden;
                 case "not_found":
                     return PersistlyErrorCode.NotFound;
                 case "conflict":
@@ -390,9 +631,14 @@ namespace Persistly.Unity
                 return PersistlyErrorCode.InvalidRequest;
             }
 
-            if (statusCode == 401 || statusCode == 403)
+            if (statusCode == 401)
             {
                 return PersistlyErrorCode.Unauthorized;
+            }
+
+            if (statusCode == 403)
+            {
+                return PersistlyErrorCode.Forbidden;
             }
 
             if (statusCode == 404)
@@ -431,6 +677,14 @@ namespace Persistly.Unity
             }
         }
 
+        private static void EnsureSessionToken(string profileSessionToken)
+        {
+            if (string.IsNullOrWhiteSpace(profileSessionToken))
+            {
+                throw new PersistlyConfigurationError("profileSessionToken must be set.");
+            }
+        }
+
         private static Dictionary<string, object?> AsObject(object? value, string label)
         {
             var dictionary = value as Dictionary<string, object?>;
@@ -444,13 +698,13 @@ namespace Persistly.Unity
 
         private static Dictionary<string, object?> GetRequiredObject(Dictionary<string, object?> element, string propertyName, string label)
         {
-            Dictionary<string, object?> property;
+            Dictionary<string, object?>? property;
             if (!TryGetObject(element, propertyName, out property))
             {
                 throw new PersistlyConfigurationError(label + " is missing required property " + propertyName + ".");
             }
 
-            return property;
+            return property!;
         }
 
         private static bool TryGetObject(Dictionary<string, object?> element, string propertyName, out Dictionary<string, object?>? property)
@@ -504,6 +758,17 @@ namespace Persistly.Unity
             }
 
             return ConvertToInt(property!, label + "." + propertyName);
+        }
+
+        private static bool GetRequiredBool(Dictionary<string, object?> element, string propertyName, string label)
+        {
+            object? property;
+            if (!element.TryGetValue(propertyName, out property) || !(property is bool value))
+            {
+                throw new PersistlyConfigurationError(label + "." + propertyName + " must be a boolean.");
+            }
+
+            return value;
         }
 
         private static int? GetOptionalInt(Dictionary<string, object?> element, string propertyName)
