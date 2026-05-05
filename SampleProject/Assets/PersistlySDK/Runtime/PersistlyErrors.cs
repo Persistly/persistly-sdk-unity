@@ -7,6 +7,7 @@ namespace Persistly.Unity
     {
         InvalidRequest,
         Unauthorized,
+        Forbidden,
         NotFound,
         Conflict,
         RateLimited,
@@ -67,6 +68,14 @@ namespace Persistly.Unity
     {
         public PersistlyUnauthorizedError(int statusCode, string message, string? detailsJson = null)
             : base(statusCode, PersistlyErrorCode.Unauthorized, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyForbiddenError : PersistlyApiError
+    {
+        public PersistlyForbiddenError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.Forbidden, message, detailsJson)
         {
         }
     }

@@ -37,9 +37,9 @@ namespace Persistly.Unity.LastBeacon
             _profile = _store.Load();
             _state.LoadFrom(_profile.State);
             RebuildClientIfPossible();
-            _status = string.IsNullOrWhiteSpace(_profile.SaveId)
+            _status = string.IsNullOrWhiteSpace(_profile.CharacterSaveId)
                 ? "No remote save linked yet. Create one when ready."
-                : "Stored saveId found. Use Connect / Resume to load the canonical server state.";
+                : "Stored character saveId found. Use Connect / Resume to load the canonical server state.";
         }
 
         private void Update()
@@ -109,7 +109,7 @@ namespace Persistly.Unity.LastBeacon
             GUILayout.Label("Persistly Connection", SectionStyle());
             _profile.Config.BaseUrl = DrawField("API Base URL", _profile.Config.BaseUrl);
             _profile.Config.RuntimeKey = DrawField("Runtime Key", _profile.Config.RuntimeKey);
-            _profile.Config.ExternalUserId = DrawField("External User ID", _profile.Config.ExternalUserId);
+            _profile.Config.PlayerRef = DrawField("Player reference", _profile.Config.PlayerRef);
             _profile.Config.CharacterName = DrawField("Character Name", _profile.Config.CharacterName);
             _profile.Config.SlotLabel = DrawField("Slot Label", _profile.Config.SlotLabel);
             GUILayout.Label("Persistent path: " + Application.persistentDataPath);
@@ -123,19 +123,19 @@ namespace Persistly.Unity.LastBeacon
             }
 
             GUI.enabled = _pendingTask == null;
-            if (GUILayout.Button(string.IsNullOrWhiteSpace(_profile.SaveId) ? "Create Remote Save" : "Connect / Resume", GUILayout.Height(32f)))
+            if (GUILayout.Button(string.IsNullOrWhiteSpace(_profile.CharacterSaveId) ? "Create Profile" : "Connect / Resume", GUILayout.Height(32f)))
             {
-                if (string.IsNullOrWhiteSpace(_profile.SaveId))
+                if (string.IsNullOrWhiteSpace(_profile.CharacterSaveId))
                 {
-                    BeginTask(CreateRemoteSaveAsync, "Creating Persistly save...");
+                    BeginTask(CreateProfileAsync, "Creating Persistly profile...");
                 }
                 else
                 {
-                    BeginTask(LoadRemoteSaveAsync, "Loading canonical Persistly save...");
+                    BeginTask(LoadProfileCharacterAsync, "Loading canonical Persistly character save...");
                 }
             }
 
-            GUI.enabled = !string.IsNullOrWhiteSpace(_profile.SaveId) && _pendingTask == null;
+            GUI.enabled = !string.IsNullOrWhiteSpace(_profile.CharacterSaveId) && _pendingTask == null;
             if (GUILayout.Button("Sync Now", GUILayout.Height(32f)))
             {
                 BeginTask(SyncCurrentSaveAsync, "Syncing beacon state...");
@@ -148,7 +148,8 @@ namespace Persistly.Unity.LastBeacon
         private void DrawStatusSection()
         {
             GUILayout.Label("Connection Status", SectionStyle());
-            GUILayout.Label("Save ID: " + (string.IsNullOrWhiteSpace(_profile.SaveId) ? "(none)" : _profile.SaveId));
+            GUILayout.Label("Profile Save ID: " + (string.IsNullOrWhiteSpace(_profile.ProfileSaveId) ? "(none)" : _profile.ProfileSaveId));
+            GUILayout.Label("Character Save ID: " + (string.IsNullOrWhiteSpace(_profile.CharacterSaveId) ? "(none)" : _profile.CharacterSaveId));
             GUILayout.Label("Version: " + _profile.Version);
             GUILayout.Label("Connected: " + (_connected ? "yes" : "no"));
             GUILayout.Label("Auto-sync in: " + Mathf.Max(_syncCountdown, 0f).ToString("0.0") + "s");
@@ -227,38 +228,51 @@ namespace Persistly.Unity.LastBeacon
             GUILayout.EndHorizontal();
         }
 
-        private async Task CreateRemoteSaveAsync()
+        private async Task CreateProfileAsync()
         {
             var client = EnsureClient();
-            var created = await client.CreateSaveAsync(new PersistlyCreateSaveRequest(
-                JsonUtility.ToJson(_state.ToSaveState()),
+            var created = await client.CreateProfileAsync(new PersistlyCreateProfileRequest(
+                "{\"credits\":0}",
                 JsonUtility.ToJson(BuildMetadata()),
-                NormalizeOptional(_profile.Config.ExternalUserId)));
+                JsonUtility.ToJson(_state.ToSaveState()),
+                "{\"sample\":\"last-beacon\"}",
+                NormalizeOptional(_profile.Config.PlayerRef)));
 
-            ApplyCanonicalSave(created, "Created new Persistly save.");
+            _profile.ProfileSaveId = created.ProfileSaveId;
+            _profile.ProfileSessionToken = created.ProfileSessionToken;
+            ApplyCanonicalSave(created.Character.Save, "Created new Persistly profile and character save.");
             _connected = true;
         }
 
-        private async Task LoadRemoteSaveAsync()
+        private async Task LoadProfileCharacterAsync()
         {
             var client = EnsureClient();
-            var loaded = await client.LoadSaveAsync(_profile.SaveId);
+            EnsureProfileSession();
+            var loaded = await client.LoadProfileCharacterAsync(
+                _profile.ProfileSaveId,
+                _profile.ProfileSessionToken,
+                _profile.CharacterSaveId);
             ApplyCanonicalSave(loaded, "Loaded canonical state from Persistly.");
             _connected = true;
         }
 
         private async Task SyncCurrentSaveAsync()
         {
-            if (string.IsNullOrWhiteSpace(_profile.SaveId))
+            if (string.IsNullOrWhiteSpace(_profile.CharacterSaveId))
             {
-                throw new PersistlyConfigurationError("No saveId is stored yet. Create a remote save first.");
+                throw new PersistlyConfigurationError("No character saveId is stored yet. Create a remote save first.");
             }
 
             var client = EnsureClient();
-            var sync = await client.SyncSaveAsync(_profile.SaveId, new PersistlySyncSaveRequest(
-                JsonUtility.ToJson(_state.ToSaveState()),
-                _profile.Version,
-                JsonUtility.ToJson(BuildMetadata())));
+            EnsureProfileSession();
+            var sync = await client.SyncProfileCharacterAsync(
+                _profile.ProfileSaveId,
+                _profile.ProfileSessionToken,
+                _profile.CharacterSaveId,
+                new PersistlySyncSaveRequest(
+                    JsonUtility.ToJson(_state.ToSaveState()),
+                    _profile.Version,
+                    JsonUtility.ToJson(BuildMetadata())));
 
             ApplyCanonicalSave(sync.Save, sync.Status == PersistlySyncStatus.Conflict
                 ? "Conflict received. Local state replaced with canonical remote save."
@@ -297,7 +311,11 @@ namespace Persistly.Unity.LastBeacon
 
         private void ApplyCanonicalSave(PersistlySave save, string status)
         {
-            _profile.SaveId = save.SaveId;
+            if (string.IsNullOrWhiteSpace(_profile.CharacterSaveId))
+            {
+                _profile.CharacterSaveId = save.SaveId;
+            }
+
             _profile.Version = save.Version;
             _profile.State = JsonUtility.FromJson<LastBeaconSaveState>(save.StateJson) ?? new LastBeaconSaveState();
             _state.LoadFrom(_profile.State);
@@ -323,6 +341,14 @@ namespace Persistly.Unity.LastBeacon
             }
 
             return _client;
+        }
+
+        private void EnsureProfileSession()
+        {
+            if (string.IsNullOrWhiteSpace(_profile.ProfileSaveId) || string.IsNullOrWhiteSpace(_profile.ProfileSessionToken))
+            {
+                throw new PersistlyConfigurationError("No profile session is stored yet. Create a profile first.");
+            }
         }
 
         private void RebuildClientIfPossible()
