@@ -1,15 +1,15 @@
 # Persistly Unity SDK
 
-Unity runtime SDK for Persistly profile saves, profile sessions, character save-sync, and local autosave support.
+Unity runtime SDK for Persistly game-friendly saves, profile sessions, character save-sync, and local autosave support.
 
 Persistly is a lightweight cloud save backend for games. The recommended Unity flow is:
 
-1. Create a profile with the first character.
-2. Persist `profileSaveId`, `profileSessionToken`, and character `saveId` locally.
-3. Load and sync characters through the profile session.
-4. Keep gameplay state local first, then sync remotely at safe intervals or on explicit player action.
+1. Configure `PersistlyGameSaves` once with a runtime key and player reference.
+2. Save and load gameplay slots locally through `PersistlyGameSaves.Shared`.
+3. Call `ForceSyncAsync` from explicit player actions or safe sync points.
+4. Use the advanced runtime client only when you need raw profile/session or migration APIs.
 
-Raw create/load/sync save calls remain available for advanced migrations, but new games should start with profile sessions.
+Task 4 ships a local-first facade shell. Remote profile API wiring will be added separately.
 
 ## Install
 
@@ -22,6 +22,42 @@ https://github.com/Persistly/persistly-sdk-unity.git?path=/
 In Unity, open Package Manager, choose **Add package from git URL**, paste the URL, then configure a `ps_test_...` or `ps_live_...` runtime key in your game code or inspector.
 
 ## Quickstart
+
+```csharp
+using Persistly.Unity;
+
+await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings(
+    runtimeKey: "ps_test_...",
+    playerRef: "player-184",
+    syncIntervalSeconds: 60));
+
+await PersistlyGameSaves.Shared.SaveSlotAsync("slot-1", new PlayerSaveState
+{
+    Gold = 120,
+    Level = 2
+});
+
+var loaded = await PersistlyGameSaves.Shared.LoadSlotAsync<PlayerSaveState>("slot-1");
+var state = loaded.State;
+
+var sync = await PersistlyGameSaves.Shared.ForceSyncAsync("slot-1");
+
+if (sync.Status == PersistlySlotStatus.Conflict)
+{
+    // Remote conflict handling will be surfaced here when cloud sync is wired.
+}
+
+[System.Serializable]
+public sealed class PlayerSaveState
+{
+    public int Gold;
+    public int Level;
+}
+```
+
+## Advanced Runtime Client
+
+Use `PersistlyClient` directly for profile sessions, character save-sync, migrations, and lower-level API access.
 
 ```csharp
 using Persistly.Unity;
@@ -65,6 +101,10 @@ if (result.Status == PersistlySyncStatus.Conflict)
 The package includes:
 
 - `PersistlyClient`
+- `PersistlyGameSaves`
+- `PersistlyGameSavesSettings`
+- `PersistlySlotStatus`
+- `PersistlySlotResult`
 - `CreateProfileAsync`, `LoadProfileAsync`, `CreateProfileCharacterAsync`, `LoadProfileCharacterAsync`, and `SyncProfileCharacterAsync`
 - advanced raw `CreateSaveAsync`, `LoadSaveAsync`, and `SyncSaveAsync`
 - `GetRuntimeConfigAsync` for server-provided sync policy
