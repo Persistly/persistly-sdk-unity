@@ -9,7 +9,7 @@ Persistly is a lightweight cloud save backend for games. The recommended Unity f
 3. Call `ForceSyncAsync` from explicit player actions or safe sync points.
 4. Use the advanced runtime client only when you need raw profile/session or migration APIs.
 
-Task 4 ships a local-first facade shell. Remote profile API wiring will be added separately.
+This release includes a local-first facade shell. Remote profile API wiring will be added separately.
 
 ## Install
 
