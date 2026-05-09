@@ -2,12 +2,11 @@
 
 This folder holds the smallest Unity-facing usage sample for the Persistly Unity SDK.
 
-The example uses:
+The example uses the facade-first game-saves path:
 
-- `PersistlyClientOptions`
-- `PersistlyClient`
-- `PersistlyCreateSaveRequest`
-- `PersistlySyncSaveRequest`
+- `PersistlyGameSavesSettings`
+- `PersistlyGameSaves`
+- `FilePersistlyGameSavesStore`
+- `PersistlySaveSlotOptions`
 
-The sample keeps payloads as JSON object strings so the package stays dependency-free and explicit about what gets sent to the runtime API.
-
+It saves locally first, loads from local storage, then calls `ForceSyncAsync` explicitly. The SDK does not start automatic background sync timers.

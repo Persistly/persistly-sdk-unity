@@ -105,7 +105,10 @@ namespace Persistly.Unity
             }
 
             PersistlyJson.ValidatePayloadSizes(request.ProfileMetadataJson, request.AccountDataJson);
-            PersistlyJson.ValidatePayloadSizes(request.CharacterMetadataJson, request.CharacterStateJson);
+            if (request.Character != null)
+            {
+                PersistlyJson.ValidatePayloadSizes(request.Character.MetadataJson, request.Character.StateJson);
+            }
 
             var response = await SendJsonAsync(
                 "POST",
@@ -114,8 +117,12 @@ namespace Persistly.Unity
                 cancellationToken);
 
             var created = ParseCreateProfileResponse(response.Body);
-            _cache.Store(created.Profile.Save);
-            _cache.Store(created.Character.Save);
+            _cache.Store(created.Profile);
+            if (created.Character != null)
+            {
+                _cache.Store(created.Character);
+            }
+
             return created;
         }
 
@@ -136,7 +143,7 @@ namespace Persistly.Unity
             return profile;
         }
 
-        public async Task<PersistlyCharacterEnvelope> CreateProfileCharacterAsync(
+        public async Task<PersistlyCreateProfileResponse> CreateProfileCharacterAsync(
             string profileSaveId,
             string profileSessionToken,
             PersistlyCreateProfileCharacterRequest request,
@@ -158,9 +165,41 @@ namespace Persistly.Unity
                 cancellationToken,
                 profileSessionToken: profileSessionToken);
 
-            var character = ParseCharacterEnvelope(response.Body);
-            _cache.Store(character.Save);
-            return character;
+            var created = ParseCreateProfileResponse(response.Body);
+            _cache.Store(created.Profile);
+            if (created.Character != null)
+            {
+                _cache.Store(created.Character);
+            }
+
+            return created;
+        }
+
+        public async Task<PersistlyCreateProfileResponse> ArchiveProfileCharacterAsync(
+            string profileSaveId,
+            string profileSessionToken,
+            string characterSaveId,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(profileSaveId);
+            EnsureSaveId(characterSaveId);
+            EnsureSessionToken(profileSessionToken);
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters/" + Uri.EscapeDataString(characterSaveId) + "/archive",
+                null,
+                cancellationToken,
+                profileSessionToken: profileSessionToken);
+
+            var archived = ParseCreateProfileResponse(response.Body);
+            _cache.Store(archived.Profile);
+            if (archived.Character != null)
+            {
+                _cache.Store(archived.Character);
+            }
+
+            return archived;
         }
 
         public async Task<PersistlySave> LoadProfileCharacterAsync(string profileSaveId, string profileSessionToken, string characterSaveId, CancellationToken cancellationToken = default)
@@ -228,6 +267,11 @@ namespace Persistly.Unity
 
             if (response.StatusCode == 409)
             {
+                if (IsErrorResponse(response.Body))
+                {
+                    throw ParseApiError(response.StatusCode, response.Body, response.Error);
+                }
+
                 var conflict = ParseConflictSyncResponse(response.Body);
                 _cache.Store(conflict.Save);
                 return conflict;
@@ -245,6 +289,46 @@ namespace Persistly.Unity
                 cancellationToken);
 
             return ParseRuntimeConfig(response.Body);
+        }
+
+        public async Task<PersistlySyncResponse> SyncProfileAccountDataAsync(
+            string profileSaveId,
+            string profileSessionToken,
+            PersistlySyncProfileAccountDataRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(profileSaveId);
+            EnsureSessionToken(profileSessionToken);
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            PersistlyJson.ValidatePayloadSizes(request.MetadataJson, request.AccountDataJson ?? request.AccountDataPatchJson ?? "{}");
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/account-data/sync",
+                BuildSyncProfileAccountDataBody(request),
+                cancellationToken,
+                acceptConflictStatus: true,
+                profileSessionToken: profileSessionToken);
+
+            if (response.StatusCode == 200)
+            {
+                var accepted = ParseAcceptedSyncResponse(response.Body);
+                _cache.Store(accepted.Save);
+                return accepted;
+            }
+
+            if (response.StatusCode == 409)
+            {
+                var conflict = ParseConflictSyncResponse(response.Body);
+                _cache.Store(conflict.Save);
+                return conflict;
+            }
+
+            throw ParseApiError(response.StatusCode, response.Body, response.Error);
         }
 
         public async Task<PersistlySave> LoadSaveAsync(string saveId, CancellationToken cancellationToken = default)
@@ -407,8 +491,15 @@ namespace Persistly.Unity
             }
 
             body += "\"accountData\":" + request.AccountDataJson + ",";
-            body += "\"characterMetadata\":" + request.CharacterMetadataJson + ",";
-            body += "\"characterState\":" + request.CharacterStateJson;
+            if (request.Character != null)
+            {
+                body += "\"character\":{\"metadata\":" + request.Character.MetadataJson + ",\"state\":" + request.Character.StateJson + "}";
+            }
+            else
+            {
+                body = body.TrimEnd(',');
+            }
+
             body += "}";
             return body;
         }
@@ -416,9 +507,36 @@ namespace Persistly.Unity
         private static string BuildCreateProfileCharacterBody(PersistlyCreateProfileCharacterRequest request)
         {
             return "{" +
-                "\"characterMetadata\":" + request.CharacterMetadataJson + "," +
-                "\"characterState\":" + request.CharacterStateJson +
+                "\"metadata\":" + request.CharacterMetadataJson + "," +
+                "\"state\":" + request.CharacterStateJson +
                 "}";
+        }
+
+        private static string BuildSyncProfileAccountDataBody(PersistlySyncProfileAccountDataRequest request)
+        {
+            var body = "{";
+            body += "\"baseVersion\":" + request.BaseVersion.ToString(CultureInfo.InvariantCulture);
+            if (request.AccountDataJson != null)
+            {
+                body += ",\"accountData\":" + request.AccountDataJson;
+            }
+
+            if (request.AccountDataPatchJson != null)
+            {
+                body += ",\"accountDataPatch\":" + request.AccountDataPatchJson;
+            }
+
+            if (request.ClearMetadata)
+            {
+                body += ",\"metadata\":null";
+            }
+            else if (request.MetadataJson != null)
+            {
+                body += ",\"metadata\":" + request.MetadataJson;
+            }
+
+            body += "}";
+            return body;
         }
 
         private static PersistlySave ParseSaveEnvelope(string body)
@@ -431,24 +549,38 @@ namespace Persistly.Unity
         private static PersistlyCreateProfileResponse ParseCreateProfileResponse(string body)
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "create profile response"), "create profile response");
-            var profileRoot = GetRequiredObject(root, "profile", "create profile response");
-            var characterRoot = GetRequiredObject(root, "character", "create profile response");
-            return new PersistlyCreateProfileResponse(ParseProfileEnvelope(profileRoot), ParseCharacterEnvelope(characterRoot));
+            var profileSaveId = GetRequiredString(root, "profileSaveId", "profile envelope");
+            var profileSessionToken = GetOptionalString(root, "profileSessionToken");
+            var profileRoot = GetRequiredObject(root, "profile", "profile envelope");
+            PersistlySave? character = null;
+            if (root.ContainsKey("character") && root["character"] != null)
+            {
+                character = ParseSave(GetRequiredObject(root, "character", "profile envelope"));
+            }
+
+            var policy = root.ContainsKey("syncPolicy")
+                ? ParseSyncPolicy(GetRequiredObject(root, "syncPolicy", "profile envelope"))
+                : new PersistlySyncPolicy(60, 10, true, true, true, 25);
+            return new PersistlyCreateProfileResponse(profileSaveId, profileSessionToken, ParseSave(profileRoot), character, policy);
         }
 
         private static PersistlyProfileEnvelope ParseProfileEnvelope(string body)
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "profile envelope"), "profile envelope");
-            var profileRoot = root.ContainsKey("profile") ? GetRequiredObject(root, "profile", "profile envelope") : root;
-            return ParseProfileEnvelope(profileRoot);
+            return ParseProfileEnvelope(root);
         }
 
         private static PersistlyProfileEnvelope ParseProfileEnvelope(Dictionary<string, object?> profileRoot)
         {
             var profileSaveId = GetRequiredString(profileRoot, "profileSaveId", "profile envelope");
-            var profileSessionToken = GetRequiredString(profileRoot, "profileSessionToken", "profile envelope");
-            var save = GetRequiredObject(profileRoot, "save", "profile envelope");
-            return new PersistlyProfileEnvelope(profileSaveId, profileSessionToken, ParseSave(save));
+            var profileSessionToken = GetOptionalString(profileRoot, "profileSessionToken");
+            var save = profileRoot.ContainsKey("save")
+                ? GetRequiredObject(profileRoot, "save", "profile envelope")
+                : GetRequiredObject(profileRoot, "profile", "profile envelope");
+            var policy = profileRoot.ContainsKey("syncPolicy")
+                ? ParseSyncPolicy(GetRequiredObject(profileRoot, "syncPolicy", "profile envelope"))
+                : null;
+            return new PersistlyProfileEnvelope(profileSaveId, profileSessionToken, ParseSave(save), policy);
         }
 
         private static PersistlyCharacterEnvelope ParseCharacterEnvelope(string body)
@@ -468,13 +600,18 @@ namespace Persistly.Unity
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "runtime config"), "runtime config");
             var policy = GetRequiredObject(root, "syncPolicy", "runtime config");
-            return new PersistlyRuntimeConfig(new PersistlySyncPolicy(
+            return new PersistlyRuntimeConfig(ParseSyncPolicy(policy));
+        }
+
+        private static PersistlySyncPolicy ParseSyncPolicy(Dictionary<string, object?> policy)
+        {
+            return new PersistlySyncPolicy(
                 GetRequiredInt(policy, "minRemoteSyncIntervalSeconds", "syncPolicy"),
                 GetRequiredInt(policy, "forceSyncCooldownSeconds", "syncPolicy"),
-                GetRequiredBool(policy, "syncOnBackground", "syncPolicy"),
-                GetRequiredBool(policy, "syncOnForeground", "syncPolicy"),
+                GetOptionalBool(policy, "syncOnAppBackground") ?? GetOptionalBool(policy, "syncOnBackground") ?? false,
+                GetOptionalBool(policy, "syncOnAppForeground") ?? GetOptionalBool(policy, "syncOnForeground") ?? false,
                 GetRequiredBool(policy, "syncOnReconnect", "syncPolicy"),
-                GetRequiredInt(policy, "maxQueuedLocalSnapshots", "syncPolicy")));
+                GetRequiredInt(policy, "maxQueuedLocalSnapshots", "syncPolicy"));
         }
 
         private static PersistlySyncResponse ParseAcceptedSyncResponse(string body)
@@ -554,6 +691,30 @@ namespace Persistly.Unity
 
                     code = ParseWireErrorCode(wireCode);
 
+                    if (code == PersistlyErrorCode.SlotAlreadyExists)
+                    {
+                        string? slotKey = null;
+                        Dictionary<string, object?>? details;
+                        if (TryGetObject(error, "details", out details) && details != null)
+                        {
+                            slotKey = GetOptionalString(details, "slotKey");
+                        }
+
+                        return new PersistlySlotAlreadyExistsError(statusCode, message, slotKey, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.CharacterArchived)
+                    {
+                        string? characterSaveId = null;
+                        Dictionary<string, object?>? details;
+                        if (TryGetObject(error, "details", out details) && details != null)
+                        {
+                            characterSaveId = GetOptionalString(details, "characterSaveId");
+                        }
+
+                        return new PersistlyArchivedCharacterError(statusCode, message, characterSaveId, detailsJson);
+                    }
+
                     if (code == PersistlyErrorCode.PayloadTooLarge)
                     {
                         string? field = null;
@@ -589,6 +750,10 @@ namespace Persistly.Unity
                     return new PersistlyNotFoundError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.Conflict:
                     return new PersistlyConflictError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.SlotAlreadyExists:
+                    return new PersistlySlotAlreadyExistsError(statusCode, message, null, detailsJson);
+                case PersistlyErrorCode.CharacterArchived:
+                    return new PersistlyArchivedCharacterError(statusCode, message, null, detailsJson);
                 case PersistlyErrorCode.RateLimited:
                     return new PersistlyRateLimitedError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.PayloadTooLarge:
@@ -613,6 +778,10 @@ namespace Persistly.Unity
                     return PersistlyErrorCode.NotFound;
                 case "conflict":
                     return PersistlyErrorCode.Conflict;
+                case "slot_already_exists":
+                    return PersistlyErrorCode.SlotAlreadyExists;
+                case "character_archived":
+                    return PersistlyErrorCode.CharacterArchived;
                 case "rate_limited":
                     return PersistlyErrorCode.RateLimited;
                 case "payload_too_large":
@@ -667,6 +836,29 @@ namespace Persistly.Unity
         private static string DefaultMessageForStatus(int statusCode)
         {
             return "Persistly request failed with HTTP " + statusCode.ToString(CultureInfo.InvariantCulture) + ".";
+        }
+
+        public static PersistlyApiError ParseErrorForTests(int statusCode, string body)
+        {
+            return ParseApiError(statusCode, body, null);
+        }
+
+        private static bool IsErrorResponse(string body)
+        {
+            if (string.IsNullOrWhiteSpace(body))
+            {
+                return false;
+            }
+
+            try
+            {
+                var root = PersistlyJson.ParseJsonValue(body, "response") as Dictionary<string, object?>;
+                return root != null && root.ContainsKey("error");
+            }
+            catch
+            {
+                return false;
+            }
         }
 
         private static void EnsureSaveId(string saveId)
@@ -769,6 +961,22 @@ namespace Persistly.Unity
             }
 
             return value;
+        }
+
+        private static bool? GetOptionalBool(Dictionary<string, object?> element, string propertyName)
+        {
+            object? property;
+            if (!element.TryGetValue(propertyName, out property) || property == null)
+            {
+                return null;
+            }
+
+            if (property is bool value)
+            {
+                return value;
+            }
+
+            throw new PersistlyConfigurationError(propertyName + " must be a boolean.");
         }
 
         private static int? GetOptionalInt(Dictionary<string, object?> element, string propertyName)

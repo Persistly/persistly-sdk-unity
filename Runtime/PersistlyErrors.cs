@@ -10,6 +10,8 @@ namespace Persistly.Unity
         Forbidden,
         NotFound,
         Conflict,
+        SlotAlreadyExists,
+        CharacterArchived,
         RateLimited,
         PayloadTooLarge,
         ServerError
@@ -94,6 +96,28 @@ namespace Persistly.Unity
             : base(statusCode, PersistlyErrorCode.Conflict, message, detailsJson)
         {
         }
+    }
+
+    public sealed class PersistlySlotAlreadyExistsError : PersistlyApiError
+    {
+        public PersistlySlotAlreadyExistsError(int statusCode, string message, string? slotKey, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.SlotAlreadyExists, message, detailsJson)
+        {
+            SlotKey = slotKey;
+        }
+
+        public string? SlotKey { get; }
+    }
+
+    public sealed class PersistlyArchivedCharacterError : PersistlyApiError
+    {
+        public PersistlyArchivedCharacterError(int statusCode, string message, string? characterSaveId, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.CharacterArchived, message, detailsJson)
+        {
+            CharacterSaveId = characterSaveId;
+        }
+
+        public string? CharacterSaveId { get; }
     }
 
     public sealed class PersistlyRateLimitedError : PersistlyApiError

@@ -9,7 +9,7 @@ import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
-BUNDLE = ROOT / "contracts" / "persistly-contract-v0.2.0"
+BUNDLE = ROOT / "contracts" / "persistly-contract-v0.3.0"
 MANIFEST = BUNDLE / "manifest.json"
 
 
@@ -27,7 +27,7 @@ def main() -> int:
         return 1
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    expected_bundle = "persistly-contract-v0.2.0"
+    expected_bundle = "persistly-contract-v0.3.0"
     if manifest.get("bundle") != expected_bundle:
         print(f"unexpected bundle: {manifest.get('bundle')}", file=sys.stderr)
         return 1
@@ -75,4 +75,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

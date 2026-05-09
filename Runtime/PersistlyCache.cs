@@ -362,11 +362,6 @@ namespace Persistly.Unity
 
         private async Task<PersistlyAutosaveSyncResult> SyncInternalAsync(string characterSaveId, bool force, CancellationToken cancellationToken)
         {
-            if (!_store.TryLoad(characterSaveId, out var draft))
-            {
-                return new PersistlyAutosaveSyncResult(false, null, PersistlyAutosaveSkippedReason.NoDraft);
-            }
-
             var now = DateTimeOffset.UtcNow;
             if (_lastRemoteSyncByCharacter.TryGetValue(characterSaveId, out var lastSync))
             {
@@ -380,6 +375,11 @@ namespace Persistly.Unity
                 {
                     return new PersistlyAutosaveSyncResult(false, null, PersistlyAutosaveSkippedReason.RemoteSyncInterval);
                 }
+            }
+
+            if (!_store.TryLoad(characterSaveId, out var draft))
+            {
+                return new PersistlyAutosaveSyncResult(false, null, PersistlyAutosaveSkippedReason.NoDraft);
             }
 
             var result = await _syncRemote(draft, force, cancellationToken);

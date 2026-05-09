@@ -1,15 +1,15 @@
 # Persistly Unity SDK
 
-Unity runtime SDK for Persistly game-friendly saves, profile sessions, character save-sync, and local autosave support.
+Unity runtime SDK for Persistly profile-backed, local-first game saves.
 
-Persistly is a lightweight cloud save backend for games. The recommended Unity flow is:
+The recommended Unity flow is facade-first:
 
-1. Configure `PersistlyGameSaves` once with a runtime key and player reference.
-2. Save and load gameplay slots locally through `PersistlyGameSaves.Shared`.
-3. Call `ForceSyncAsync` from explicit player actions or safe sync points.
-4. Use the advanced runtime client only when you need raw profile/session or migration APIs.
+1. Configure `PersistlyGameSaves` once with a runtime key and optional restore identifiers.
+2. Save and load named slots locally through `PersistlyGameSaves.Shared`.
+3. Call `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueProfileAsync` from explicit lifecycle/safe-sync points.
+4. Use `PersistlyClient` directly only for advanced runtime API access.
 
-This release includes a local-first facade shell. Remote profile API wiring will be added separately.
+This package is `0.10.0` and pins `persistly-contract-v0.3.0`.
 
 ## Install
 
@@ -25,26 +25,34 @@ In Unity, open Package Manager, choose **Add package from git URL**, paste the U
 
 ```csharp
 using Persistly.Unity;
+using UnityEngine;
 
-await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings(
-    runtimeKey: "ps_test_...",
-    playerRef: "player-184",
-    syncIntervalSeconds: 60));
+await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_...")
+{
+    PlayerRef = "player-184",
+    Store = new FilePersistlyGameSavesStore(Application.persistentDataPath)
+});
 
-await PersistlyGameSaves.Shared.SaveSlotAsync("slot-1", new PlayerSaveState
+await PersistlyGameSaves.Shared.SaveSlotAsync("autosave", new PlayerSaveState
 {
     Gold = 120,
     Level = 2
+}, new PersistlySaveSlotOptions
+{
+    MetadataJson = "{\"characterName\":\"Ayla\"}"
 });
 
-var loaded = await PersistlyGameSaves.Shared.LoadSlotAsync<PlayerSaveState>("slot-1");
-var state = loaded.State;
+var loaded = await PersistlyGameSaves.Shared.LoadSlotAsync<PlayerSaveState>("autosave");
+if (loaded.Status == PersistlySlotStatus.LocalFound)
+{
+    var state = loaded.State;
+}
 
-var sync = await PersistlyGameSaves.Shared.ForceSyncAsync("slot-1");
-
+var sync = await PersistlyGameSaves.Shared.ForceSyncAsync("autosave");
 if (sync.Status == PersistlySlotStatus.Conflict)
 {
-    // Remote conflict handling will be surfaced here when cloud sync is wired.
+    var inspect = PersistlyGameSaves.Shared.InspectSlot("autosave");
+    // inspect.StateJson is local gameplay state; inspect.CloudStateJson is the canonical cloud version.
 }
 
 [System.Serializable]
@@ -55,87 +63,73 @@ public sealed class PlayerSaveState
 }
 ```
 
-## Advanced Runtime Client
+## Profiles And Restore
 
-Use `PersistlyClient` directly for profile sessions, character save-sync, migrations, and lower-level API access.
+`PersistlyGameSavesSettings` supports:
+
+- `PlayerRef`
+- `ExternalProfileRefJson`
+- `LocalProfileKey`
+- `ProfileSaveId`
+- `ProfileSessionToken`
+
+`playerRef` and `externalProfileRefJson` are optional developer references. They are not authentication, ownership proof, lookup, or recovery APIs. Cross-device restore uses explicit `ProfileSaveId` plus `ProfileSessionToken`, usually stored by your own trusted backend.
+
+`GetProfileSession()` hides the token by default:
 
 ```csharp
-using Persistly.Unity;
-
-var client = new PersistlyClient(new PersistlyClientOptions("ps_test_..."));
-
-var created = await client.CreateProfileAsync(new PersistlyCreateProfileRequest(
-    accountDataJson: "{\"diamonds\":20}",
-    characterMetadataJson: "{\"characterName\":\"Ayla\",\"slot\":1}",
-    characterStateJson: "{\"gold\":100,\"level\":1}",
-    profileMetadataJson: "{\"displayName\":\"Ayla\"}",
-    playerRef: "player-184"));
-
-// Store these locally. They are the resume material for this player/profile.
-var profileSaveId = created.ProfileSaveId;
-var profileSessionToken = created.ProfileSessionToken;
-var characterSaveId = created.Character.Save.SaveId;
-
-var loaded = await client.LoadProfileCharacterAsync(
-    profileSaveId,
-    profileSessionToken,
-    characterSaveId);
-
-var result = await client.SyncProfileCharacterAsync(
-    profileSaveId,
-    profileSessionToken,
-    characterSaveId,
-    new PersistlySyncSaveRequest(
-        stateJson: "{\"gold\":120,\"level\":2}",
-        baseVersion: loaded.Version,
-        metadataJson: "{\"characterName\":\"Ayla\",\"slot\":1}"));
-
-if (result.Status == PersistlySyncStatus.Conflict)
-{
-    // result.Save is the canonical server character save. Reconcile intentionally.
-}
+var hidden = PersistlyGameSaves.Shared.GetProfileSession();
+var exported = PersistlyGameSaves.Shared.GetProfileSession(includeToken: true);
 ```
 
-## Runtime Surface
+## Account Data
 
-The package includes:
+Profile account data is local-first and synced separately from character slots:
 
-- `PersistlyClient`
-- `PersistlyGameSaves`
-- `PersistlyGameSavesSettings`
-- `PersistlySlotStatus`
-- `PersistlySlotResult`
-- `CreateProfileAsync`, `LoadProfileAsync`, `CreateProfileCharacterAsync`, `LoadProfileCharacterAsync`, and `SyncProfileCharacterAsync`
+```csharp
+await PersistlyGameSaves.Shared.SaveAccountDataAsync(new AccountState { Diamonds = 25 });
+await PersistlyGameSaves.Shared.PatchAccountDataAsync("{\"diamonds\":30,\"oldKey\":null}");
+await PersistlyGameSaves.Shared.ForceSyncProfileAsync();
+```
+
+Profile account-data sync preserves server-owned `characterSlots`; it never rewrites slot references from account data.
+
+## Slots And Conflicts
+
+Use named slots for gameplay saves:
+
+- `SaveSlotAsync` writes local state immediately.
+- `LoadSlotAsync`, `ListSlots`, and `InspectSlot` are local-only.
+- `ForceSyncAsync` syncs one slot and respects manual cooldown unless `BypassCooldown` is set.
+- `SyncDueSlotsAsync` syncs dirty slots only when the runtime policy allows it.
+- `ArchiveSlotAsync` archives remotely before marking a local slot archived.
+- No automatic background timers are started by the SDK.
+
+Conflicts keep local and cloud state separate. Local gameplay state is never overwritten automatically. Use:
+
+- `AcceptCloudVersionAsync`
+- `OverwriteCloudVersionAsync`
+- `KeepLocalForLaterAsync`
+
+## Advanced Runtime Client
+
+`PersistlyClient` exposes the underlying v0.3.0 runtime API:
+
+- profile-only `CreateProfileAsync`
+- optional initial character creation
+- `CreateProfileCharacterAsync`
+- `LoadProfileCharacterAsync`
+- `SyncProfileCharacterAsync`
+- `SyncProfileAccountDataAsync`
+- `ArchiveProfileCharacterAsync`
+- typed `slot_already_exists` and `character_archived` errors
 - advanced raw `CreateSaveAsync`, `LoadSaveAsync`, and `SyncSaveAsync`
-- `GetRuntimeConfigAsync` for server-provided sync policy
-- typed runtime errors, including forbidden profile-session failures
-- `InMemoryPersistlySaveCache`
-- `InMemoryPersistlyAutosaveDraftStore`
-- `FilePersistlyAutosaveDraftStore`
-- `PersistlyAutosaveManager`
-- `UnityWebRequestTransport`
-- Unity-safe JSON parsing and serialization without `System.Text.Json`
 
-## Profile Sessions
-
-Profile endpoints require `profileSessionToken`. The SDK sends it as `X-Persistly-Profile-Session` for profile and character routes.
-
-`playerRef` and `externalProfileRefJson` are optional developer references. `externalProfileRefJson` must be a JSON object such as `{"provider":"auth0","subject":"auth0|user_123"}`. These references are not authentication tokens, not ownership proof, and not public lookup APIs. Store `profileSaveId` and `profileSessionToken` locally or in your own trusted backend.
-
-## Autosave
-
-`PersistlyAutosaveManager` lets games write every state change to local storage while respecting Persistly remote-sync policy:
-
-- local changes are stored immediately
-- remote sync can be throttled by `minRemoteSyncIntervalSeconds`
-- explicit sync buttons can use force sync and honor `forceSyncCooldownSeconds`
-- if the game closes before remote sync, the local draft is still available
-
-Use `FilePersistlyAutosaveDraftStore` with `Application.persistentDataPath` for real players and `InMemoryPersistlyAutosaveDraftStore` for tests.
+Profile character metadata is built with SDK-owned `_persistly.slotKey`; developer metadata must not provide `_persistly` directly.
 
 ## Contract Bundle
 
-This repo pins `persistly-contract-v0.2.0` under `contracts/`.
+This repo pins `persistly-contract-v0.3.0` under `contracts/`.
 The bundle is authoritative for request/response semantics, routes, and runtime limits.
 
 ## Validation
@@ -160,13 +154,6 @@ UNITY_BIN="/Applications/Unity/Unity-6000.4.2f1/Unity.app/Contents/MacOS/Unity"
 
 ## Examples
 
-- `examples/MinimalUsage.cs` for a minimal profile/session snippet
+- `examples/MinimalUsage.cs` for a minimal facade-first snippet
 - `SampleProject/Assets/LastBeacon/` for the playable endless-idle sample
 - `SampleProject/Assets/Scenes/LastBeacon.unity` for the generated demo scene
-
-## Release Checklist
-
-- validate the pinned contract bundle
-- run the Unity edit-mode suite
-- open `SampleProject` and verify `Last Beacon` against a real runtime key
-- keep sample defaults aligned with `https://api.persistly.app`
