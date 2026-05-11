@@ -63,6 +63,8 @@ public sealed class PlayerSaveState
 }
 ```
 
+`SaveSlotAsync` writes local gameplay state immediately. The first `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueAsync` call creates the remote Persistly profile and the matching character slot if needed.
+
 ## Profiles And Restore
 
 `PersistlyGameSavesSettings` supports:
@@ -132,7 +134,7 @@ Profile character metadata is built with SDK-owned `_persistly.slotKey`; develop
 This repo pins `persistly-contract-v0.3.0` under `contracts/`.
 The bundle is authoritative for request/response semantics, routes, and runtime limits.
 
-## Validation
+## Validate Local Changes
 
 Run the local bundle check from the repo root:
 
