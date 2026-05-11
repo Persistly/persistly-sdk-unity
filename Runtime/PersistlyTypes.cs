@@ -290,11 +290,18 @@ namespace Persistly.Unity
 
     public sealed class PersistlySyncResponse
     {
-        public PersistlySyncResponse(PersistlySyncStatus status, PersistlySave save, PersistlySyncConflictDetails? details = null)
+        public PersistlySyncResponse(
+            PersistlySyncStatus status,
+            PersistlySave save,
+            PersistlySyncConflictDetails? details = null,
+            bool historyRetained = false,
+            IReadOnlyList<string>? warnings = null)
         {
             Status = status;
             Save = save;
             Details = details;
+            HistoryRetained = historyRetained;
+            Warnings = warnings ?? Array.Empty<string>();
         }
 
         public PersistlySyncStatus Status { get; }
@@ -302,6 +309,10 @@ namespace Persistly.Unity
         public PersistlySave Save { get; }
 
         public PersistlySyncConflictDetails? Details { get; }
+
+        public bool HistoryRetained { get; }
+
+        public IReadOnlyList<string> Warnings { get; }
     }
 
     public sealed class PersistlySyncProfileAccountDataRequest
