@@ -15,6 +15,11 @@ namespace Persistly.Unity
         private readonly IPersistlySaveCache _cache;
         private readonly int _timeoutSeconds;
         private readonly string _userAgent;
+        private readonly string _sdkName;
+        private readonly string _sdkVersion;
+        private readonly string _platform;
+        private readonly string? _engineVersion;
+        private readonly string? _clientVersion;
 
         public PersistlyClient(PersistlyClientOptions options)
         {
@@ -43,6 +48,11 @@ namespace Persistly.Unity
             _cache = options.Cache ?? new InMemoryPersistlySaveCache();
             _timeoutSeconds = options.TimeoutSeconds;
             _userAgent = options.UserAgent;
+            _sdkName = NormalizeDiagnosticsHeader(options.SdkName, "unity");
+            _sdkVersion = NormalizeDiagnosticsHeader(options.SdkVersion, "0.10.0");
+            _platform = NormalizeDiagnosticsHeader(options.Platform, "unity");
+            _engineVersion = NormalizeOptionalDiagnosticsHeader(options.EngineVersion);
+            _clientVersion = NormalizeOptionalDiagnosticsHeader(options.ClientVersion);
         }
 
         public Task UpdateLocalAsync(PersistlySave save)
@@ -260,7 +270,12 @@ namespace Persistly.Unity
 
             if (response.StatusCode == 200)
             {
-                var accepted = ParseAcceptedSyncResponse(response.Body);
+                PersistlySave cachedSave;
+                _cache.TryGet(characterSaveId, out cachedSave);
+                var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
+                var accepted = BuildAcceptedSyncResponse(
+                    acceptedPayload,
+                    acceptedPayload.Save ?? SynthesizeSave(characterSaveId, cachedSave, request.MetadataJson, request.StateJson));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -280,11 +295,19 @@ namespace Persistly.Unity
             throw ParseApiError(response.StatusCode, response.Body, response.Error);
         }
 
-        public async Task<PersistlyRuntimeConfig> GetRuntimeConfigAsync(CancellationToken cancellationToken = default)
+        public async Task<PersistlyRuntimeConfig> GetRuntimeConfigAsync(int? gameConfigVersion = null, CancellationToken cancellationToken = default)
         {
+            if (gameConfigVersion.HasValue && gameConfigVersion.Value < 0)
+            {
+                throw new PersistlyConfigurationError("gameConfigVersion must be a non-negative integer.");
+            }
+
+            var path = gameConfigVersion.HasValue
+                ? "/api/v1/runtime-config?gameConfigVersion=" + gameConfigVersion.Value.ToString(CultureInfo.InvariantCulture)
+                : "/api/v1/runtime-config";
             var response = await SendJsonAsync(
                 "GET",
-                "/api/v1/runtime-config",
+                path,
                 null,
                 cancellationToken);
 
@@ -316,7 +339,12 @@ namespace Persistly.Unity
 
             if (response.StatusCode == 200)
             {
-                var accepted = ParseAcceptedSyncResponse(response.Body);
+                PersistlySave cachedSave;
+                _cache.TryGet(profileSaveId, out cachedSave);
+                var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
+                var accepted = BuildAcceptedSyncResponse(
+                    acceptedPayload,
+                    acceptedPayload.Save ?? SynthesizeProfileSave(profileSaveId, cachedSave, request));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -378,7 +406,12 @@ namespace Persistly.Unity
 
             if (response.StatusCode == 200)
             {
-                var accepted = ParseAcceptedSyncResponse(response.Body);
+                PersistlySave cachedSave;
+                _cache.TryGet(saveId, out cachedSave);
+                var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
+                var accepted = BuildAcceptedSyncResponse(
+                    acceptedPayload,
+                    acceptedPayload.Save ?? SynthesizeSave(saveId, cachedSave, request.MetadataJson, request.StateJson));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -405,8 +438,19 @@ namespace Persistly.Unity
             {
                 { "Authorization", "Bearer " + _runtimeKey },
                 { "Content-Type", "application/json" },
-                { "User-Agent", _userAgent }
+                { "User-Agent", _userAgent },
+                { "X-Persistly-SDK", _sdkName },
+                { "X-Persistly-SDK-Version", _sdkVersion },
+                { "X-Persistly-Platform", _platform }
             };
+            if (!string.IsNullOrWhiteSpace(_engineVersion))
+            {
+                headers["X-Persistly-Engine-Version"] = _engineVersion!;
+            }
+            if (!string.IsNullOrWhiteSpace(_clientVersion))
+            {
+                headers["X-Persistly-Client-Version"] = _clientVersion!;
+            }
             if (!string.IsNullOrWhiteSpace(profileSessionToken))
             {
                 headers["X-Persistly-Profile-Session"] = profileSessionToken.Trim();
@@ -600,7 +644,33 @@ namespace Persistly.Unity
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "runtime config"), "runtime config");
             var policy = GetRequiredObject(root, "syncPolicy", "runtime config");
-            return new PersistlyRuntimeConfig(ParseSyncPolicy(policy));
+            PersistlyRuntimeGameConfig? gameConfig = null;
+            Dictionary<string, object?>? gameConfigRoot;
+            if (TryGetObject(root, "gameConfig", out gameConfigRoot))
+            {
+                gameConfig = ParseRuntimeGameConfig(gameConfigRoot!);
+            }
+
+            return new PersistlyRuntimeConfig(ParseSyncPolicy(policy), gameConfig);
+        }
+
+        private static PersistlyRuntimeGameConfig ParseRuntimeGameConfig(Dictionary<string, object?> gameConfig)
+        {
+            var configJson = "{}";
+            Dictionary<string, object?>? config;
+            if (TryGetObject(gameConfig, "config", out config))
+            {
+                configJson = PersistlyJson.Serialize(config);
+            }
+
+            return new PersistlyRuntimeGameConfig(
+                GetRequiredBool(gameConfig, "enabled", "gameConfig"),
+                GetOptionalInt(gameConfig, "version"),
+                GetOptionalBool(gameConfig, "unchanged") ?? false,
+                GetOptionalInt(gameConfig, "sizeBytes"),
+                GetOptionalBool(gameConfig, "hasData") ?? false,
+                GetOptionalString(gameConfig, "eventName"),
+                configJson);
         }
 
         private static PersistlySyncPolicy ParseSyncPolicy(Dictionary<string, object?> policy)
@@ -614,7 +684,29 @@ namespace Persistly.Unity
                 GetRequiredInt(policy, "maxQueuedLocalSnapshots", "syncPolicy"));
         }
 
-        private static PersistlySyncResponse ParseAcceptedSyncResponse(string body)
+        private sealed class AcceptedSyncPayload
+        {
+            public AcceptedSyncPayload(PersistlySave? save, int version, DateTimeOffset updatedAt, bool historyRetained, IReadOnlyList<string> warnings)
+            {
+                Save = save;
+                Version = version;
+                UpdatedAt = updatedAt;
+                HistoryRetained = historyRetained;
+                Warnings = warnings;
+            }
+
+            public PersistlySave? Save { get; }
+
+            public int Version { get; }
+
+            public DateTimeOffset UpdatedAt { get; }
+
+            public bool HistoryRetained { get; }
+
+            public IReadOnlyList<string> Warnings { get; }
+        }
+
+        private static AcceptedSyncPayload ParseAcceptedSyncResponse(string body)
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "sync response"), "sync response");
             var status = GetRequiredString(root, "status", "sync response");
@@ -623,8 +715,132 @@ namespace Persistly.Unity
                 throw new PersistlyConfigurationError("Accepted sync response had an unexpected status.");
             }
 
-            var save = GetRequiredObject(root, "save", "sync response");
-            return new PersistlySyncResponse(PersistlySyncStatus.Accepted, ParseSave(save));
+            PersistlySave? save = null;
+            if (TryGetObject(root, "save", out var saveObject) && saveObject != null)
+            {
+                save = ParseSave(saveObject);
+            }
+
+            var version = root.ContainsKey("version") ? GetRequiredInt(root, "version", "sync response") : save?.Version ?? 0;
+            if (version < 1)
+            {
+                throw new PersistlyConfigurationError("Accepted sync response version must be greater than zero.");
+            }
+
+            var updatedAt = root.ContainsKey("updatedAt")
+                ? GetRequiredDateTimeOffset(root, "updatedAt", "sync response")
+                : save?.UpdatedAt ?? DateTimeOffset.MinValue;
+            if (updatedAt == DateTimeOffset.MinValue)
+            {
+                throw new PersistlyConfigurationError("Accepted sync response updatedAt must be set.");
+            }
+
+            var historyRetained = root.ContainsKey("historyRetained") ? GetRequiredBool(root, "historyRetained", "sync response") : false;
+            return new AcceptedSyncPayload(save, version, updatedAt, historyRetained, ParseWarnings(root));
+        }
+
+        private static PersistlySyncResponse BuildAcceptedSyncResponse(AcceptedSyncPayload payload, PersistlySave save)
+        {
+            return new PersistlySyncResponse(
+                PersistlySyncStatus.Accepted,
+                new PersistlySave(
+                    save.SaveId,
+                    save.PlayerRef,
+                    save.MetadataJson,
+                    save.StateJson,
+                    payload.Version,
+                    save.CreatedAt,
+                    payload.UpdatedAt),
+                historyRetained: payload.HistoryRetained,
+                warnings: payload.Warnings);
+        }
+
+        private static PersistlySave SynthesizeSave(string saveId, PersistlySave? cachedSave, string? metadataJson, string stateJson)
+        {
+            return new PersistlySave(
+                saveId,
+                cachedSave?.PlayerRef,
+                metadataJson ?? cachedSave?.MetadataJson ?? "{}",
+                stateJson,
+                1,
+                cachedSave?.CreatedAt ?? DateTimeOffset.FromUnixTimeSeconds(0),
+                DateTimeOffset.FromUnixTimeSeconds(0));
+        }
+
+        private static PersistlySave SynthesizeProfileSave(
+            string profileSaveId,
+            PersistlySave? cachedSave,
+            PersistlySyncProfileAccountDataRequest request)
+        {
+            var cachedState = cachedSave == null
+                ? new Dictionary<string, object?>()
+                : AsObject(PersistlyJson.ParseJsonValue(cachedSave.StateJson, "cached profile state"), "cached profile state");
+            var accountData = request.AccountDataJson != null
+                ? AsObject(PersistlyJson.ParseJsonValue(request.AccountDataJson, "accountData"), "accountData")
+                : MergeObjects(
+                    cachedState.ContainsKey("accountData") && cachedState["accountData"] is Dictionary<string, object?> existingAccountData
+                        ? existingAccountData
+                        : new Dictionary<string, object?>(),
+                    request.AccountDataPatchJson == null
+                        ? new Dictionary<string, object?>()
+                        : AsObject(PersistlyJson.ParseJsonValue(request.AccountDataPatchJson, "accountDataPatch"), "accountDataPatch"));
+            var characterSlots = cachedState.ContainsKey("characterSlots") && cachedState["characterSlots"] is List<object?> existingSlots
+                ? existingSlots
+                : new List<object?>();
+            var stateJson = PersistlyJson.Serialize(new Dictionary<string, object?>
+            {
+                ["schema"] = "persistly.profile.v1",
+                ["accountData"] = accountData,
+                ["characterSlots"] = characterSlots,
+            });
+
+            return new PersistlySave(
+                profileSaveId,
+                cachedSave?.PlayerRef,
+                request.ClearMetadata ? "{}" : request.MetadataJson ?? cachedSave?.MetadataJson ?? "{}",
+                stateJson,
+                1,
+                cachedSave?.CreatedAt ?? DateTimeOffset.FromUnixTimeSeconds(0),
+                DateTimeOffset.FromUnixTimeSeconds(0));
+        }
+
+        private static Dictionary<string, object?> MergeObjects(
+            Dictionary<string, object?> existing,
+            Dictionary<string, object?> patch)
+        {
+            var merged = new Dictionary<string, object?>(existing);
+            foreach (var pair in patch)
+            {
+                merged[pair.Key] = pair.Value;
+            }
+
+            return merged;
+        }
+
+        private static IReadOnlyList<string> ParseWarnings(Dictionary<string, object?> root)
+        {
+            if (!root.ContainsKey("warnings") || root["warnings"] == null)
+            {
+                return Array.Empty<string>();
+            }
+
+            if (!(root["warnings"] is List<object?> rawWarnings))
+            {
+                throw new PersistlyConfigurationError("sync response.warnings must be an array.");
+            }
+
+            var warnings = new List<string>(rawWarnings.Count);
+            foreach (var warning in rawWarnings)
+            {
+                if (!(warning is string value))
+                {
+                    throw new PersistlyConfigurationError("sync response.warnings must contain only strings.");
+                }
+
+                warnings.Add(value);
+            }
+
+            return warnings;
         }
 
         private static PersistlySyncResponse ParseConflictSyncResponse(string body)
@@ -1026,6 +1242,16 @@ namespace Persistly.Unity
             }
 
             return value;
+        }
+
+        private static string NormalizeDiagnosticsHeader(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        }
+
+        private static string? NormalizeOptionalDiagnosticsHeader(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
     }
 }

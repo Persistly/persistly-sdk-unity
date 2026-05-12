@@ -31,6 +31,16 @@ namespace Persistly.Unity
         public int TimeoutSeconds { get; set; } = 30;
 
         public string UserAgent { get; set; } = "Persistly Unity SDK/0.10.0";
+
+        public string SdkName { get; set; } = "unity";
+
+        public string SdkVersion { get; set; } = "0.10.0";
+
+        public string Platform { get; set; } = "unity";
+
+        public string? EngineVersion { get; set; }
+
+        public string? ClientVersion { get; set; }
     }
 
     public sealed class PersistlyCreateSaveRequest
@@ -259,12 +269,50 @@ namespace Persistly.Unity
 
     public sealed class PersistlyRuntimeConfig
     {
-        public PersistlyRuntimeConfig(PersistlySyncPolicy syncPolicy)
+        public PersistlyRuntimeConfig(PersistlySyncPolicy syncPolicy, PersistlyRuntimeGameConfig? gameConfig = null)
         {
             SyncPolicy = syncPolicy;
+            GameConfig = gameConfig;
         }
 
         public PersistlySyncPolicy SyncPolicy { get; }
+
+        public PersistlyRuntimeGameConfig? GameConfig { get; }
+    }
+
+    public sealed class PersistlyRuntimeGameConfig
+    {
+        public PersistlyRuntimeGameConfig(
+            bool enabled,
+            int? version = null,
+            bool unchanged = false,
+            int? sizeBytes = null,
+            bool hasData = false,
+            string? eventName = null,
+            string configJson = "{}")
+        {
+            Enabled = enabled;
+            Version = version;
+            Unchanged = unchanged;
+            SizeBytes = sizeBytes;
+            HasData = hasData;
+            EventName = eventName;
+            ConfigJson = string.IsNullOrWhiteSpace(configJson) ? "{}" : configJson;
+        }
+
+        public bool Enabled { get; }
+
+        public int? Version { get; }
+
+        public bool Unchanged { get; }
+
+        public int? SizeBytes { get; }
+
+        public bool HasData { get; }
+
+        public string? EventName { get; }
+
+        public string ConfigJson { get; }
     }
 
     public enum PersistlySyncStatus
@@ -290,11 +338,18 @@ namespace Persistly.Unity
 
     public sealed class PersistlySyncResponse
     {
-        public PersistlySyncResponse(PersistlySyncStatus status, PersistlySave save, PersistlySyncConflictDetails? details = null)
+        public PersistlySyncResponse(
+            PersistlySyncStatus status,
+            PersistlySave save,
+            PersistlySyncConflictDetails? details = null,
+            bool historyRetained = false,
+            IReadOnlyList<string>? warnings = null)
         {
             Status = status;
             Save = save;
             Details = details;
+            HistoryRetained = historyRetained;
+            Warnings = warnings ?? Array.Empty<string>();
         }
 
         public PersistlySyncStatus Status { get; }
@@ -302,6 +357,10 @@ namespace Persistly.Unity
         public PersistlySave Save { get; }
 
         public PersistlySyncConflictDetails? Details { get; }
+
+        public bool HistoryRetained { get; }
+
+        public IReadOnlyList<string> Warnings { get; }
     }
 
     public sealed class PersistlySyncProfileAccountDataRequest

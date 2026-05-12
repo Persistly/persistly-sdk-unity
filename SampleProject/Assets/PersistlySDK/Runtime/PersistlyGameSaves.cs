@@ -43,11 +43,18 @@ namespace Persistly.Unity
 
     public sealed class PersistlyGameSaveResult
     {
-        public PersistlyGameSaveResult(PersistlyGameSaveTarget target, PersistlyGameSaveStatus status, PersistlyGameSaveConflict? conflict = null)
+        public PersistlyGameSaveResult(
+            PersistlyGameSaveTarget target,
+            PersistlyGameSaveStatus status,
+            PersistlyGameSaveConflict? conflict = null,
+            bool historyRetained = false,
+            IReadOnlyList<string>? warnings = null)
         {
             Target = target;
             Status = status;
             Conflict = conflict;
+            HistoryRetained = historyRetained;
+            Warnings = warnings ?? Array.Empty<string>();
         }
 
         public PersistlyGameSaveTarget Target { get; }
@@ -55,15 +62,26 @@ namespace Persistly.Unity
         public PersistlyGameSaveStatus Status { get; }
 
         public PersistlyGameSaveConflict? Conflict { get; }
+
+        public bool HistoryRetained { get; }
+
+        public IReadOnlyList<string> Warnings { get; }
     }
 
     public class PersistlySlotResult
     {
-        public PersistlySlotResult(string slotKey, PersistlySlotStatus status, PersistlyGameSaveConflict? conflict = null)
+        public PersistlySlotResult(
+            string slotKey,
+            PersistlySlotStatus status,
+            PersistlyGameSaveConflict? conflict = null,
+            bool historyRetained = false,
+            IReadOnlyList<string>? warnings = null)
         {
             SlotKey = slotKey;
             Status = status;
             Conflict = conflict;
+            HistoryRetained = historyRetained;
+            Warnings = warnings ?? Array.Empty<string>();
         }
 
         public string SlotKey { get; }
@@ -71,6 +89,10 @@ namespace Persistly.Unity
         public PersistlySlotStatus Status { get; }
 
         public PersistlyGameSaveConflict? Conflict { get; }
+
+        public bool HistoryRetained { get; }
+
+        public IReadOnlyList<string> Warnings { get; }
     }
 
     public sealed class PersistlySlotResult<TState> : PersistlySlotResult where TState : class
@@ -681,7 +703,11 @@ namespace Persistly.Unity
                 _profile.LastRemoteSyncAt = _profile.LastForceSyncAt;
                 SaveProfile();
                 Notify(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Synced);
-                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Synced);
+                return new PersistlyGameSaveResult(
+                    PersistlyGameSaveTarget.Profile,
+                    PersistlyGameSaveStatus.Synced,
+                    historyRetained: response.HistoryRetained,
+                    warnings: response.Warnings);
             }
             catch (PersistlyRateLimitedError)
             {
@@ -871,7 +897,11 @@ namespace Persistly.Unity
                 ApplySyncedSlot(slot, response.Save);
                 SaveSlot(slot);
                 Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
-                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                return new PersistlySlotResult(
+                    normalizedSlotKey,
+                    PersistlySlotStatus.Synced,
+                    historyRetained: response.HistoryRetained,
+                    warnings: response.Warnings);
             }
             catch (PersistlyRateLimitedError)
             {

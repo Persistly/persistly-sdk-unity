@@ -15,6 +15,11 @@ namespace Persistly.Unity
         private readonly IPersistlySaveCache _cache;
         private readonly int _timeoutSeconds;
         private readonly string _userAgent;
+        private readonly string _sdkName;
+        private readonly string _sdkVersion;
+        private readonly string _platform;
+        private readonly string? _engineVersion;
+        private readonly string? _clientVersion;
 
         public PersistlyClient(PersistlyClientOptions options)
         {
@@ -43,6 +48,11 @@ namespace Persistly.Unity
             _cache = options.Cache ?? new InMemoryPersistlySaveCache();
             _timeoutSeconds = options.TimeoutSeconds;
             _userAgent = options.UserAgent;
+            _sdkName = NormalizeDiagnosticsHeader(options.SdkName, "unity");
+            _sdkVersion = NormalizeDiagnosticsHeader(options.SdkVersion, "0.10.0");
+            _platform = NormalizeDiagnosticsHeader(options.Platform, "unity");
+            _engineVersion = NormalizeOptionalDiagnosticsHeader(options.EngineVersion);
+            _clientVersion = NormalizeOptionalDiagnosticsHeader(options.ClientVersion);
         }
 
         public Task UpdateLocalAsync(PersistlySave save)
@@ -285,11 +295,19 @@ namespace Persistly.Unity
             throw ParseApiError(response.StatusCode, response.Body, response.Error);
         }
 
-        public async Task<PersistlyRuntimeConfig> GetRuntimeConfigAsync(CancellationToken cancellationToken = default)
+        public async Task<PersistlyRuntimeConfig> GetRuntimeConfigAsync(int? gameConfigVersion = null, CancellationToken cancellationToken = default)
         {
+            if (gameConfigVersion.HasValue && gameConfigVersion.Value < 0)
+            {
+                throw new PersistlyConfigurationError("gameConfigVersion must be a non-negative integer.");
+            }
+
+            var path = gameConfigVersion.HasValue
+                ? "/api/v1/runtime-config?gameConfigVersion=" + gameConfigVersion.Value.ToString(CultureInfo.InvariantCulture)
+                : "/api/v1/runtime-config";
             var response = await SendJsonAsync(
                 "GET",
-                "/api/v1/runtime-config",
+                path,
                 null,
                 cancellationToken);
 
@@ -420,8 +438,19 @@ namespace Persistly.Unity
             {
                 { "Authorization", "Bearer " + _runtimeKey },
                 { "Content-Type", "application/json" },
-                { "User-Agent", _userAgent }
+                { "User-Agent", _userAgent },
+                { "X-Persistly-SDK", _sdkName },
+                { "X-Persistly-SDK-Version", _sdkVersion },
+                { "X-Persistly-Platform", _platform }
             };
+            if (!string.IsNullOrWhiteSpace(_engineVersion))
+            {
+                headers["X-Persistly-Engine-Version"] = _engineVersion!;
+            }
+            if (!string.IsNullOrWhiteSpace(_clientVersion))
+            {
+                headers["X-Persistly-Client-Version"] = _clientVersion!;
+            }
             if (!string.IsNullOrWhiteSpace(profileSessionToken))
             {
                 headers["X-Persistly-Profile-Session"] = profileSessionToken.Trim();
@@ -615,7 +644,33 @@ namespace Persistly.Unity
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "runtime config"), "runtime config");
             var policy = GetRequiredObject(root, "syncPolicy", "runtime config");
-            return new PersistlyRuntimeConfig(ParseSyncPolicy(policy));
+            PersistlyRuntimeGameConfig? gameConfig = null;
+            Dictionary<string, object?>? gameConfigRoot;
+            if (TryGetObject(root, "gameConfig", out gameConfigRoot))
+            {
+                gameConfig = ParseRuntimeGameConfig(gameConfigRoot!);
+            }
+
+            return new PersistlyRuntimeConfig(ParseSyncPolicy(policy), gameConfig);
+        }
+
+        private static PersistlyRuntimeGameConfig ParseRuntimeGameConfig(Dictionary<string, object?> gameConfig)
+        {
+            var configJson = "{}";
+            Dictionary<string, object?>? config;
+            if (TryGetObject(gameConfig, "config", out config))
+            {
+                configJson = PersistlyJson.Serialize(config);
+            }
+
+            return new PersistlyRuntimeGameConfig(
+                GetRequiredBool(gameConfig, "enabled", "gameConfig"),
+                GetOptionalInt(gameConfig, "version"),
+                GetOptionalBool(gameConfig, "unchanged") ?? false,
+                GetOptionalInt(gameConfig, "sizeBytes"),
+                GetOptionalBool(gameConfig, "hasData") ?? false,
+                GetOptionalString(gameConfig, "eventName"),
+                configJson);
         }
 
         private static PersistlySyncPolicy ParseSyncPolicy(Dictionary<string, object?> policy)
@@ -1187,6 +1242,16 @@ namespace Persistly.Unity
             }
 
             return value;
+        }
+
+        private static string NormalizeDiagnosticsHeader(string value, string fallback)
+        {
+            return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        }
+
+        private static string? NormalizeOptionalDiagnosticsHeader(string? value)
+        {
+            return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
     }
 }

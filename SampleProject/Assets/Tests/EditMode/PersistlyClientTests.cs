@@ -70,6 +70,9 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(loaded.SaveId, Is.EqualTo("sv_char"));
             Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-Profile-Session"], Is.EqualTo("pst_profile_session"));
+            Assert.That(transport.LastRequest.Headers["X-Persistly-SDK"], Is.EqualTo("unity"));
+            Assert.That(transport.LastRequest.Headers["X-Persistly-SDK-Version"], Is.EqualTo("0.10.0"));
+            Assert.That(transport.LastRequest.Headers["X-Persistly-Platform"], Is.EqualTo("unity"));
         }
 
         [Test]
@@ -140,17 +143,22 @@ namespace Persistly.Unity.LastBeacon.Tests
         [Test]
         public async Task GetRuntimeConfigParsesSyncPolicy()
         {
-            var transport = new StubTransport(
+            var transport = new RecordingTransport(
                 200,
-                "{\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
+                "{\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25},\"gameConfig\":{\"enabled\":true,\"version\":3,\"sizeBytes\":37,\"hasData\":true,\"eventName\":\"launch\",\"config\":{\"season\":\"spring\"}}}");
             var client = BuildClient(transport);
 
-            var config = await client.GetRuntimeConfigAsync();
+            var config = await client.GetRuntimeConfigAsync(gameConfigVersion: 2);
 
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/runtime-config?gameConfigVersion=2"));
             Assert.That(config.SyncPolicy.MinRemoteSyncIntervalSeconds, Is.EqualTo(60));
             Assert.That(config.SyncPolicy.ForceSyncCooldownSeconds, Is.EqualTo(10));
             Assert.That(config.SyncPolicy.SyncOnBackground, Is.True);
             Assert.That(config.SyncPolicy.MaxQueuedLocalSnapshots, Is.EqualTo(25));
+            Assert.That(config.GameConfig, Is.Not.Null);
+            Assert.That(config.GameConfig!.Enabled, Is.True);
+            Assert.That(config.GameConfig.Version, Is.EqualTo(3));
+            Assert.That(config.GameConfig.ConfigJson, Does.Contain("\"season\":\"spring\""));
         }
 
         [Test]
