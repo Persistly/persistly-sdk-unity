@@ -154,6 +154,25 @@ UNITY_BIN="/Applications/Unity/Unity-6000.4.2f1/Unity.app/Contents/MacOS/Unity"
   -logFile -
 ```
 
+## Live Parity Smoke
+
+Run this only with a dev/test runtime key. It creates a temporary profile and `autosave` character slot through `PersistlyGameSaves`, verifies local load, runtime config, force sync, due-slot sync, profile account-data sync, and exported profile session data.
+
+```bash
+UNITY_BIN="/Applications/Unity/Unity-6000.4.2f1/Unity.app/Contents/MacOS/Unity" \
+PERSISTLY_RUNTIME_KEY=ps_test_replace_me \
+Scripts/live_smoke.sh
+```
+
+Optional:
+
+```bash
+PERSISTLY_API_BASE=https://stage-api.persistly.app \
+UNITY_BIN="/path/to/Unity" \
+PERSISTLY_RUNTIME_KEY=ps_test_replace_me \
+Scripts/live_smoke.sh
+```
+
 ## Examples
 
 - `examples/MinimalUsage.cs` for a minimal facade-first snippet
