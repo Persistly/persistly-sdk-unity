@@ -4,6 +4,7 @@
 
 - First stable public Unity SDK release.
 - Adds `PersistlyGameSaves` as the recommended game-friendly facade for named slots, local-first saves, profile account data, profile sessions, due-slot sync, force sync, and explicit conflict states.
+- Reconciles an existing remote slot when a local slot is missing its `CharacterSaveId`, preventing duplicate-slot errors after reinstall, cache loss, or local state drift.
 - Adds profile creation, profile session headers, profile-scoped character load/sync, runtime config, and local autosave draft helpers.
 - Keeps raw save create/load/sync available as advanced APIs.
 - Adds dev/test live parity smoke tooling for real API validation without committing runtime keys.

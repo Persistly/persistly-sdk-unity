@@ -863,16 +863,23 @@ namespace Persistly.Unity
                 await EnsureProfileAsync(cancellationToken);
                 if (string.IsNullOrWhiteSpace(slot.CharacterSaveId))
                 {
-                    var created = await _client.CreateProfileCharacterAsync(
-                        _profile.ProfileSaveId!,
-                        _profile.ProfileSessionToken!,
-                        new PersistlyCreateProfileCharacterRequest(slot.SlotKey, slot.MetadataJson, slot.StateJson),
-                        cancellationToken);
-                    ApplyProfileResponse(created, false);
-                    ApplySyncedSlot(slot, created.Character!);
-                    SaveSlot(slot);
-                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                    try
+                    {
+                        var created = await _client.CreateProfileCharacterAsync(
+                            _profile.ProfileSaveId!,
+                            _profile.ProfileSessionToken!,
+                            new PersistlyCreateProfileCharacterRequest(slot.SlotKey, slot.MetadataJson, slot.StateJson),
+                            cancellationToken);
+                        ApplyProfileResponse(created, false);
+                        ApplySyncedSlot(slot, created.Character!);
+                        SaveSlot(slot);
+                        Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
+                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                    }
+                    catch (PersistlySlotAlreadyExistsError)
+                    {
+                        await ReconcileExistingRemoteSlotAsync(normalizedSlotKey, cancellationToken);
+                    }
                 }
 
                 var response = await _client.SyncProfileCharacterAsync(
@@ -1129,18 +1136,77 @@ namespace Persistly.Unity
 
         private void ApplyProfileSave(PersistlySave save, bool dirty)
         {
+            var profileState = PersistlyProfileState.Parse(save.StateJson);
             _profile.ProfileSaveId = save.SaveId;
             _profile.Version = save.Version;
-            _profile.AccountDataJson = ExtractAccountData(save.StateJson);
+            _profile.AccountDataJson = profileState.AccountDataJson;
             _profile.MetadataJson = save.MetadataJson;
             _profile.PendingAccountDataPatchJson = null;
             _profile.Dirty = dirty;
             _profile.UpdatedAt = save.UpdatedAt;
+            ApplyCharacterSlotRefs(profileState.CharacterSlots);
         }
 
         private static string ExtractAccountData(string profileStateJson)
         {
             return PersistlyProfileState.Parse(profileStateJson).AccountDataJson;
+        }
+
+        private async Task ReconcileExistingRemoteSlotAsync(string slotKey, CancellationToken cancellationToken)
+        {
+            await RestoreProfileAsync(cancellationToken, preserveLocalDirty: true);
+            LocalSlotRecord slot;
+            lock (_gate)
+            {
+                if (!_slots.TryGetValue(slotKey, out slot) || string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+                {
+                    throw new PersistlyConfigurationError("slot_reconcile_failed: Persistly could not find remote slot " + slotKey + " after duplicate slot response.");
+                }
+            }
+
+            var remoteSave = await _client.LoadProfileCharacterAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, slot.CharacterSaveId!, cancellationToken);
+            lock (_gate)
+            {
+                ApplyRemoteSlotSnapshot(slot, remoteSave);
+                SaveSlot(slot);
+            }
+        }
+
+        private void ApplyCharacterSlotRefs(IReadOnlyList<PersistlyCharacterSlotRef> slotRefs)
+        {
+            foreach (var slotRef in slotRefs)
+            {
+                var slotKey = PersistlySlotKey.Normalize(slotRef.SlotKey);
+                if (!_slots.TryGetValue(slotKey, out var slot))
+                {
+                    slot = new LocalSlotRecord(slotKey);
+                    _slots[slotKey] = slot;
+                }
+
+                slot.CharacterSaveId = slotRef.CharacterSaveId;
+                if (string.Equals(slot.MetadataJson, "{}", StringComparison.Ordinal))
+                {
+                    slot.MetadataJson = StripPersistlyMetadata(slotRef.MetadataJson);
+                }
+
+                slot.Archived = slotRef.Archived;
+                SaveSlot(slot);
+            }
+        }
+
+        private static void ApplyRemoteSlotSnapshot(LocalSlotRecord slot, PersistlySave save)
+        {
+            slot.CharacterSaveId = save.SaveId;
+            slot.Version = save.Version;
+            slot.CloudStateJson = save.StateJson;
+            slot.CloudMetadataJson = save.MetadataJson;
+            slot.CloudVersion = save.Version;
+            slot.LastRemoteSyncAt = DateTimeOffset.UtcNow;
+            slot.UpdatedAt = save.UpdatedAt;
+            if (string.Equals(slot.MetadataJson, "{}", StringComparison.Ordinal))
+            {
+                slot.MetadataJson = StripPersistlyMetadata(save.MetadataJson);
+            }
         }
 
         private void ApplySyncedSlot(LocalSlotRecord slot, PersistlySave save)
