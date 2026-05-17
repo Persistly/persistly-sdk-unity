@@ -1,6 +1,6 @@
 {
   "name": "com.persistly.sdk.unity",
-  "version": "0.10.0",
+  "version": "1.0.0",
   "displayName": "Persistly Unity SDK",
   "description": "Unity SDK and playable sample project for Persistly profile saves, sessions, and character sync.",
   "license": "Apache-2.0",
@@ -24,7 +24,8 @@
     "CHANGELOG.md",
     "LICENSE",
     "SECURITY.md",
-    "package.json"
+    "package.json",
+    "UPM_RELEASE.md"
   ],
   "keywords": [
     "persistly",

@@ -9,7 +9,7 @@ The recommended Unity flow is facade-first:
 3. Call `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueProfileAsync` from explicit lifecycle/safe-sync points.
 4. Use `PersistlyClient` directly only for advanced runtime API access.
 
-This package is `0.10.0` and pins `persistly-contract-v0.3.0`.
+This package is `1.0.0` and pins `persistly-contract-v0.3.0`.
 
 ## Install
 
@@ -17,6 +17,12 @@ Add the package from the public Persistly Unity repository:
 
 ```text
 https://github.com/Persistly/persistly-sdk-unity.git?path=/
+```
+
+For the stable release tag:
+
+```text
+https://github.com/Persistly/persistly-sdk-unity.git?path=/#v1.0.0
 ```
 
 In Unity, open Package Manager, choose **Add package from git URL**, paste the URL, then configure a `ps_test_...` or `ps_live_...` runtime key in your game code or inspector.
@@ -172,6 +178,16 @@ UNITY_BIN="/path/to/Unity" \
 PERSISTLY_RUNTIME_KEY=ps_test_replace_me \
 Scripts/live_smoke.sh
 ```
+
+## Release Package
+
+Build the UPM archive for a GitHub release attachment:
+
+```bash
+Scripts/package_release.sh 1.0.0
+```
+
+Release metadata lives in `UPM_RELEASE.md`.
 
 ## Examples
 

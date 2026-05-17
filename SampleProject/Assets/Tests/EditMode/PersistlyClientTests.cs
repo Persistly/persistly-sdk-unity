@@ -71,7 +71,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-Profile-Session"], Is.EqualTo("pst_profile_session"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-SDK"], Is.EqualTo("unity"));
-            Assert.That(transport.LastRequest.Headers["X-Persistly-SDK-Version"], Is.EqualTo("0.10.0"));
+            Assert.That(transport.LastRequest.Headers["X-Persistly-SDK-Version"], Is.EqualTo("1.0.0"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-Platform"], Is.EqualTo("unity"));
         }
 

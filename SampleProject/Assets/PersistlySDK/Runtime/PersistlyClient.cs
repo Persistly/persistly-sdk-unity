@@ -49,7 +49,7 @@ namespace Persistly.Unity
             _timeoutSeconds = options.TimeoutSeconds;
             _userAgent = options.UserAgent;
             _sdkName = NormalizeDiagnosticsHeader(options.SdkName, "unity");
-            _sdkVersion = NormalizeDiagnosticsHeader(options.SdkVersion, "0.10.0");
+            _sdkVersion = NormalizeDiagnosticsHeader(options.SdkVersion, "1.0.0");
             _platform = NormalizeDiagnosticsHeader(options.Platform, "unity");
             _engineVersion = NormalizeOptionalDiagnosticsHeader(options.EngineVersion);
             _clientVersion = NormalizeOptionalDiagnosticsHeader(options.ClientVersion);
