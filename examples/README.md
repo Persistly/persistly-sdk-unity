@@ -10,3 +10,8 @@ The example uses the facade-first game-saves path:
 - `PersistlySaveSlotOptions`
 
 It saves locally first, loads from local storage, then calls `ForceSyncAsync` explicitly. The SDK does not start automatic background sync timers.
+
+Runtime delete helpers also exist on same facade:
+
+- `DeleteSlotAsync("autosave")` for one character slot
+- `DeleteProfileAsync()` for whole stored profile namespace

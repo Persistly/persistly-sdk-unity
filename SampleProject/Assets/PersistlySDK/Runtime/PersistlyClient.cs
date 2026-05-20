@@ -153,6 +153,23 @@ namespace Persistly.Unity
             return profile;
         }
 
+        public async Task<PersistlyDeleteProfileResponse> DeleteProfileAsync(string profileSaveId, string profileSessionToken, CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(profileSaveId);
+            EnsureSessionToken(profileSessionToken);
+
+            var response = await SendJsonAsync(
+                "DELETE",
+                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId),
+                null,
+                cancellationToken,
+                profileSessionToken: profileSessionToken);
+
+            var deleted = ParseDeleteProfileResponse(response.Body);
+            _cache.Clear(profileSaveId);
+            return deleted;
+        }
+
         public async Task<PersistlyCreateProfileResponse> CreateProfileCharacterAsync(
             string profileSaveId,
             string profileSessionToken,
@@ -228,6 +245,33 @@ namespace Persistly.Unity
             var save = ParseSaveEnvelope(response.Body);
             _cache.Store(save);
             return save;
+        }
+
+        public async Task<PersistlyDeleteProfileCharacterResponse> DeleteProfileCharacterAsync(
+            string profileSaveId,
+            string profileSessionToken,
+            string characterSaveId,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(profileSaveId);
+            EnsureSaveId(characterSaveId);
+            EnsureSessionToken(profileSessionToken);
+
+            var response = await SendJsonAsync(
+                "DELETE",
+                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters/" + Uri.EscapeDataString(characterSaveId),
+                null,
+                cancellationToken,
+                profileSessionToken: profileSessionToken);
+
+            var deleted = ParseDeleteProfileCharacterResponse(response.Body);
+            _cache.Clear(characterSaveId);
+            if (deleted.Profile != null)
+            {
+                _cache.Store(deleted.Profile);
+            }
+
+            return deleted;
         }
 
         public async Task<PersistlySyncResponse> SyncProfileCharacterAsync(
@@ -625,6 +669,45 @@ namespace Persistly.Unity
                 ? ParseSyncPolicy(GetRequiredObject(profileRoot, "syncPolicy", "profile envelope"))
                 : null;
             return new PersistlyProfileEnvelope(profileSaveId, profileSessionToken, ParseSave(save), policy);
+        }
+
+        private static PersistlyDeleteProfileResponse ParseDeleteProfileResponse(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "delete profile response"), "delete profile response");
+            var profileSaveId = GetRequiredString(root, "profileSaveId", "delete profile response");
+            var deletedAt = GetRequiredDateTimeOffset(root, "deletedAt", "delete profile response");
+            var deletedCharacterCount = GetRequiredInt(root, "deletedCharacterCount", "delete profile response");
+            if (deletedCharacterCount < 0)
+            {
+                throw new PersistlyConfigurationError("delete profile response deletedCharacterCount must be zero or greater.");
+            }
+
+            return new PersistlyDeleteProfileResponse(
+                profileSaveId,
+                deletedAt,
+                deletedCharacterCount,
+                GetRequiredBool(root, "alreadyDeleted", "delete profile response"),
+                GetRequiredBool(root, "cleanupQueued", "delete profile response"));
+        }
+
+        private static PersistlyDeleteProfileCharacterResponse ParseDeleteProfileCharacterResponse(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "delete profile character response"), "delete profile character response");
+            PersistlySave? profile = null;
+            Dictionary<string, object?>? profileRoot;
+            if (TryGetObject(root, "profile", out profileRoot))
+            {
+                profile = ParseSave(profileRoot!);
+            }
+
+            return new PersistlyDeleteProfileCharacterResponse(
+                GetRequiredString(root, "profileSaveId", "delete profile character response"),
+                GetRequiredString(root, "characterSaveId", "delete profile character response"),
+                GetRequiredDateTimeOffset(root, "deletedAt", "delete profile character response"),
+                GetRequiredBool(root, "alreadyDeleted", "delete profile character response"),
+                GetRequiredBool(root, "cleanupQueued", "delete profile character response"),
+                GetOptionalString(root, "slotKey"),
+                profile);
         }
 
         private static PersistlyCharacterEnvelope ParseCharacterEnvelope(string body)

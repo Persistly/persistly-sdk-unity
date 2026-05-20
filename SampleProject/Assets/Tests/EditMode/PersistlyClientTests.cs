@@ -114,6 +114,67 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
+        public async Task DeleteProfileCharacterUsesDeleteRouteClearsCharacterCacheAndUpdatesProfileCache()
+        {
+            var cache = new InMemoryPersistlySaveCache();
+            cache.Store(new PersistlySave(
+                "sv_char",
+                "player-184",
+                "{\"_persistly\":{\"slotKey\":\"autosave\"}}",
+                "{\"level\":1}",
+                1,
+                System.DateTimeOffset.Parse("2026-04-10T00:00:00Z"),
+                System.DateTimeOffset.Parse("2026-04-10T00:00:00Z")));
+            var transport = new RecordingTransport(
+                200,
+                "{\"profileSaveId\":\"sv_profile\",\"characterSaveId\":\"sv_char\",\"slotKey\":\"autosave\",\"deletedAt\":\"2026-04-10T00:04:00Z\",\"alreadyDeleted\":false,\"cleanupQueued\":true,\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[]},\"version\":4,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:04:00Z\"}}");
+            var client = new PersistlyClient(new PersistlyClientOptions("http://127.0.0.1:8080", "ps_test_example")
+            {
+                Transport = transport,
+                Cache = cache,
+            });
+
+            var result = await client.DeleteProfileCharacterAsync("sv_profile", "pst_profile_session", "sv_char");
+
+            Assert.That(result.CharacterSaveId, Is.EqualTo("sv_char"));
+            Assert.That(result.CleanupQueued, Is.True);
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char"));
+            Assert.That(client.TryGetLocal("sv_char", out _), Is.False);
+            Assert.That(client.TryGetLocal("sv_profile", out var cachedProfile), Is.True);
+            Assert.That(cachedProfile.Version, Is.EqualTo(4));
+        }
+
+        [Test]
+        public async Task DeleteProfileUsesDeleteRouteAndClearsProfileCache()
+        {
+            var cache = new InMemoryPersistlySaveCache();
+            cache.Store(new PersistlySave(
+                "sv_profile",
+                "player-184",
+                "{}",
+                "{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[]}",
+                2,
+                System.DateTimeOffset.Parse("2026-04-10T00:00:00Z"),
+                System.DateTimeOffset.Parse("2026-04-10T00:02:00Z")));
+            var transport = new RecordingTransport(
+                200,
+                "{\"profileSaveId\":\"sv_profile\",\"deletedAt\":\"2026-04-10T00:05:00Z\",\"deletedCharacterCount\":2,\"alreadyDeleted\":false,\"cleanupQueued\":true}");
+            var client = new PersistlyClient(new PersistlyClientOptions("http://127.0.0.1:8080", "ps_test_example")
+            {
+                Transport = transport,
+                Cache = cache,
+            });
+
+            var result = await client.DeleteProfileAsync("sv_profile", "pst_profile_session");
+
+            Assert.That(result.DeletedCharacterCount, Is.EqualTo(2));
+            Assert.That(result.CleanupQueued, Is.True);
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile"));
+            Assert.That(transport.LastRequest.Method, Is.EqualTo("DELETE"));
+            Assert.That(client.TryGetLocal("sv_profile", out _), Is.False);
+        }
+
+        [Test]
         public async Task SyncProfileCharacterReturnsConflictAndCachesCanonicalSave()
         {
             var transport = new StubTransport(

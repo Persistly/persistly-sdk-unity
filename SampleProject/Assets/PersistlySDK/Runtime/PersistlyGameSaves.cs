@@ -349,6 +349,8 @@ namespace Persistly.Unity
 
         void SaveProfileJson(string localProfileKey, string json);
 
+        void DeleteProfileJson(string localProfileKey);
+
         string? LoadSlotJson(string localProfileKey, string slotKey);
 
         void SaveSlotJson(string localProfileKey, string slotKey, string json);
@@ -371,6 +373,11 @@ namespace Persistly.Unity
         public void SaveProfileJson(string localProfileKey, string json)
         {
             _profiles[localProfileKey] = json;
+        }
+
+        public void DeleteProfileJson(string localProfileKey)
+        {
+            _profiles.Remove(localProfileKey);
         }
 
         public string? LoadSlotJson(string localProfileKey, string slotKey)
@@ -433,6 +440,15 @@ namespace Persistly.Unity
         {
             Directory.CreateDirectory(ProfileDirectory(localProfileKey));
             File.WriteAllText(ProfilePath(localProfileKey), json);
+        }
+
+        public void DeleteProfileJson(string localProfileKey)
+        {
+            var path = ProfilePath(localProfileKey);
+            if (File.Exists(path))
+            {
+                File.Delete(path);
+            }
         }
 
         public string? LoadSlotJson(string localProfileKey, string slotKey)
@@ -585,6 +601,46 @@ namespace Persistly.Unity
             {
                 return new PersistlyProfileInspection(_profile.AccountDataJson, _profile.MetadataJson, _profile.Dirty, _profile.Version);
             }
+        }
+
+        public string GetAccountDataJson()
+        {
+            lock (_gate)
+            {
+                return _profile.AccountDataJson;
+            }
+        }
+
+        public async Task<PersistlyGameSaveResult> CreateProfileAsync(CancellationToken cancellationToken = default)
+        {
+            await AssertNoExistingLocalProfileStateAsync("create_profile_local_state_exists: Call ClearLocalProfileAsync before creating a different profile.");
+            return await EnsureProfileAsync(cancellationToken);
+        }
+
+        public async Task<PersistlyGameSaveResult> AttachProfileAsync(string profileSaveId, string profileSessionToken, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(profileSaveId) || string.IsNullOrWhiteSpace(profileSessionToken))
+            {
+                throw new PersistlyConfigurationError("attach_profile_invalid_input: AttachProfileAsync requires non-empty profileSaveId and profileSessionToken.");
+            }
+
+            await AssertNoExistingLocalProfileStateAsync("attach_profile_local_state_exists: Call ClearLocalProfileAsync before attaching a different profile.");
+            var normalizedProfileSaveId = profileSaveId.Trim();
+            var normalizedProfileSessionToken = profileSessionToken.Trim();
+            var envelope = await _client.LoadProfileAsync(normalizedProfileSaveId, normalizedProfileSessionToken, cancellationToken);
+            lock (_gate)
+            {
+                _profile.ProfileSaveId = envelope.ProfileSaveId;
+                _profile.ProfileSessionToken = string.IsNullOrWhiteSpace(envelope.ProfileSessionToken) ? normalizedProfileSessionToken : envelope.ProfileSessionToken;
+                if (envelope.SyncPolicy != null)
+                {
+                    _profile.SyncPolicy = envelope.SyncPolicy;
+                }
+                ApplyProfileSave(envelope.Profile, false);
+                _profile.LastRemoteSyncAt = DateTimeOffset.UtcNow;
+                SaveProfile();
+            }
+            return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Synced);
         }
 
         public async Task<PersistlyGameSaveResult> EnsureProfileAsync(CancellationToken cancellationToken = default)
@@ -820,6 +876,70 @@ namespace Persistly.Unity
             }
         }
 
+        public async Task<PersistlySlotResult> RefreshSlotAsync(string slotKey, CancellationToken cancellationToken = default)
+        {
+            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            if (!HasProfileSession())
+            {
+                throw new PersistlyConfigurationError("refresh_slot_missing_profile_session: RefreshSlotAsync requires a stored profileSaveId and profileSessionToken.");
+            }
+
+            try
+            {
+                await RestoreProfileAsync(cancellationToken, preserveLocalDirty: true);
+
+                LocalSlotRecord slot;
+                string expectedCharacterSaveId;
+                lock (_gate)
+                {
+                    if (!_slots.TryGetValue(normalizedSlotKey, out slot) || slot.Archived || string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+                    {
+                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+                    }
+                    expectedCharacterSaveId = slot.CharacterSaveId!;
+                }
+
+                var remoteSave = await _client.LoadProfileCharacterAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, expectedCharacterSaveId, cancellationToken);
+                lock (_gate)
+                {
+                    if (!_slots.TryGetValue(normalizedSlotKey, out slot) || slot.Archived || !string.Equals(slot.CharacterSaveId, expectedCharacterSaveId, StringComparison.Ordinal))
+                    {
+                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+                    }
+
+                    if (slot.Dirty)
+                    {
+                        var conflict = BuildSlotConflict(slot, remoteSave);
+                        slot.CloudStateJson = remoteSave.StateJson;
+                        slot.CloudMetadataJson = remoteSave.MetadataJson;
+                        slot.CloudVersion = remoteSave.Version;
+                        slot.LastRemoteSyncAt = DateTimeOffset.UtcNow;
+                        slot.UpdatedAt = slot.UpdatedAt ?? remoteSave.UpdatedAt;
+                        SaveSlot(slot);
+                        Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Conflict, normalizedSlotKey, conflict);
+                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Conflict, conflict);
+                    }
+
+                    ApplySyncedSlot(slot, remoteSave);
+                    SaveSlot(slot);
+                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
+                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                }
+            }
+            catch (PersistlyRateLimitedError)
+            {
+                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.RateLimited);
+            }
+            catch (PersistlyNotFoundError)
+            {
+                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+            }
+            catch (PersistlyTransportError)
+            {
+                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Offline);
+            }
+        }
+
         public async Task<PersistlySlotResult> ForceSyncAsync(string slotKey, PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
         {
             options = options ?? new PersistlySyncOptions();
@@ -863,16 +983,23 @@ namespace Persistly.Unity
                 await EnsureProfileAsync(cancellationToken);
                 if (string.IsNullOrWhiteSpace(slot.CharacterSaveId))
                 {
-                    var created = await _client.CreateProfileCharacterAsync(
-                        _profile.ProfileSaveId!,
-                        _profile.ProfileSessionToken!,
-                        new PersistlyCreateProfileCharacterRequest(slot.SlotKey, slot.MetadataJson, slot.StateJson),
-                        cancellationToken);
-                    ApplyProfileResponse(created, false);
-                    ApplySyncedSlot(slot, created.Character!);
-                    SaveSlot(slot);
-                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                    try
+                    {
+                        var created = await _client.CreateProfileCharacterAsync(
+                            _profile.ProfileSaveId!,
+                            _profile.ProfileSessionToken!,
+                            new PersistlyCreateProfileCharacterRequest(slot.SlotKey, slot.MetadataJson, slot.StateJson),
+                            cancellationToken);
+                        ApplyProfileResponse(created, false);
+                        ApplySyncedSlot(slot, created.Character!);
+                        SaveSlot(slot);
+                        Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
+                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                    }
+                    catch (PersistlySlotAlreadyExistsError)
+                    {
+                        await ReconcileExistingRemoteSlotAsync(normalizedSlotKey, cancellationToken);
+                    }
                 }
 
                 var response = await _client.SyncProfileCharacterAsync(
@@ -1000,15 +1127,75 @@ namespace Persistly.Unity
             return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
         }
 
-        public Task<PersistlySlotResult> ClearLocalSlotAsync(string slotKey)
+        public async Task<PersistlyGameSaveResult> DeleteProfileAsync(CancellationToken cancellationToken = default)
+        {
+            if (!HasProfileSession())
+            {
+                ResetLocalProfileState();
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.LocalSaved);
+            }
+
+            var response = await _client.DeleteProfileAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, cancellationToken);
+            ResetLocalProfileState();
+            return new PersistlyGameSaveResult(
+                PersistlyGameSaveTarget.Profile,
+                PersistlyGameSaveStatus.Synced,
+                warnings: response.CleanupQueued ? new[] { "delete_cleanup_queued" } : null);
+        }
+
+        public async Task<PersistlySlotResult> DeleteSlotAsync(string slotKey, CancellationToken cancellationToken = default)
         {
             var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            LocalSlotRecord? slot;
+            lock (_gate)
+            {
+                _slots.TryGetValue(normalizedSlotKey, out slot);
+            }
+
+            if (slot == null)
+            {
+                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+            }
+
+            if (string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+            {
+                DeleteLocalSlot(normalizedSlotKey);
+                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved);
+            }
+
+            if (!HasProfileSession())
+            {
+                throw new PersistlyConfigurationError("delete_slot_missing_profile_session: deleteSlot requires a stored profileSaveId and profileSessionToken.");
+            }
+
+            var response = await _client.DeleteProfileCharacterAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, slot.CharacterSaveId!, cancellationToken);
             lock (_gate)
             {
                 _slots.Remove(normalizedSlotKey);
                 _store.DeleteSlotJson(_localProfileKey, normalizedSlotKey);
+                if (response.Profile != null)
+                {
+                    ApplyProfileSave(response.Profile, false);
+                    SaveProfile();
+                }
             }
 
+            return new PersistlySlotResult(
+                normalizedSlotKey,
+                PersistlySlotStatus.Synced,
+                warnings: response.CleanupQueued ? new[] { "delete_cleanup_queued" } : null);
+        }
+
+        public Task<PersistlyGameSaveResult> ClearLocalProfileAsync()
+        {
+            ResetLocalProfileState();
+            return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.LocalSaved));
+        }
+
+        public Task<PersistlySlotResult> ClearLocalSlotAsync(string slotKey)
+        {
+            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            DeleteLocalSlot(normalizedSlotKey);
             return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved));
         }
 
@@ -1129,18 +1316,132 @@ namespace Persistly.Unity
 
         private void ApplyProfileSave(PersistlySave save, bool dirty)
         {
+            var profileState = PersistlyProfileState.Parse(save.StateJson);
             _profile.ProfileSaveId = save.SaveId;
             _profile.Version = save.Version;
-            _profile.AccountDataJson = ExtractAccountData(save.StateJson);
+            _profile.AccountDataJson = profileState.AccountDataJson;
             _profile.MetadataJson = save.MetadataJson;
             _profile.PendingAccountDataPatchJson = null;
             _profile.Dirty = dirty;
             _profile.UpdatedAt = save.UpdatedAt;
+            ApplyCharacterSlotRefs(profileState.CharacterSlots);
         }
 
         private static string ExtractAccountData(string profileStateJson)
         {
             return PersistlyProfileState.Parse(profileStateJson).AccountDataJson;
+        }
+
+        private async Task ReconcileExistingRemoteSlotAsync(string slotKey, CancellationToken cancellationToken)
+        {
+            await RestoreProfileAsync(cancellationToken, preserveLocalDirty: true);
+            LocalSlotRecord slot;
+            lock (_gate)
+            {
+                if (!_slots.TryGetValue(slotKey, out slot) || string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+                {
+                    throw new PersistlyConfigurationError("slot_reconcile_failed: Persistly could not find remote slot " + slotKey + " after duplicate slot response.");
+                }
+            }
+
+            var remoteSave = await _client.LoadProfileCharacterAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, slot.CharacterSaveId!, cancellationToken);
+            lock (_gate)
+            {
+                ApplyRemoteSlotSnapshot(slot, remoteSave);
+                SaveSlot(slot);
+            }
+        }
+
+        private async Task AssertNoExistingLocalProfileStateAsync(string message)
+        {
+            bool hasLocalProfileState;
+            lock (_gate)
+            {
+                hasLocalProfileState = !IsBlankLocalProfileState(_profile) || _slots.Count > 0;
+            }
+
+            if (hasLocalProfileState)
+            {
+                throw new PersistlyConfigurationError(message);
+            }
+
+            await Task.CompletedTask;
+        }
+
+        private static bool IsBlankLocalProfileState(LocalProfileRecord profile)
+        {
+            return string.IsNullOrWhiteSpace(profile.ProfileSaveId)
+                && string.IsNullOrWhiteSpace(profile.ProfileSessionToken)
+                && string.Equals(profile.AccountDataJson, "{}", StringComparison.Ordinal)
+                && string.Equals(profile.MetadataJson, "{}", StringComparison.Ordinal)
+                && !profile.Dirty
+                && !profile.Version.HasValue
+                && profile.CloudAccountDataJson == null
+                && !profile.CloudVersion.HasValue
+                && !profile.UpdatedAt.HasValue
+                && !profile.LastForceSyncAt.HasValue
+                && !profile.LastRemoteSyncAt.HasValue;
+        }
+
+        private void ResetLocalProfileState()
+        {
+            lock (_gate)
+            {
+                foreach (var slotKey in new List<string>(_slots.Keys))
+                {
+                    _store.DeleteSlotJson(_localProfileKey, slotKey);
+                }
+
+                _slots.Clear();
+                _store.DeleteProfileJson(_localProfileKey);
+                _profile = CreateClearedProfile(Settings);
+            }
+        }
+
+        private void DeleteLocalSlot(string normalizedSlotKey)
+        {
+            lock (_gate)
+            {
+                _slots.Remove(normalizedSlotKey);
+                _store.DeleteSlotJson(_localProfileKey, normalizedSlotKey);
+            }
+        }
+
+        private void ApplyCharacterSlotRefs(IReadOnlyList<PersistlyCharacterSlotRef> slotRefs)
+        {
+            foreach (var slotRef in slotRefs)
+            {
+                var slotKey = PersistlySlotKey.Normalize(slotRef.SlotKey);
+                if (!_slots.TryGetValue(slotKey, out var slot))
+                {
+                    slot = new LocalSlotRecord(slotKey);
+                    _slots[slotKey] = slot;
+                }
+
+                slot.CharacterSaveId = slotRef.CharacterSaveId;
+                if (string.Equals(slot.MetadataJson, "{}", StringComparison.Ordinal))
+                {
+                    slot.MetadataJson = StripPersistlyMetadata(slotRef.MetadataJson);
+                }
+
+                slot.Archived = slotRef.Archived;
+                SaveSlot(slot);
+            }
+        }
+
+        private static void ApplyRemoteSlotSnapshot(LocalSlotRecord slot, PersistlySave save)
+        {
+            slot.CharacterSaveId = save.SaveId;
+            slot.Version = save.Version;
+            slot.CloudStateJson = save.StateJson;
+            slot.CloudMetadataJson = save.MetadataJson;
+            slot.CloudVersion = save.Version;
+            slot.LastRemoteSyncAt = DateTimeOffset.UtcNow;
+            slot.UpdatedAt = save.UpdatedAt;
+            if (string.Equals(slot.MetadataJson, "{}", StringComparison.Ordinal))
+            {
+                slot.MetadataJson = StripPersistlyMetadata(save.MetadataJson);
+            }
         }
 
         private void ApplySyncedSlot(LocalSlotRecord slot, PersistlySave save)
@@ -1261,7 +1562,31 @@ namespace Persistly.Unity
         private static LocalProfileRecord LoadProfile(IPersistlyGameSavesStore store, string localProfileKey, PersistlyGameSavesSettings settings)
         {
             var json = store.LoadProfileJson(localProfileKey);
-            var profile = string.IsNullOrWhiteSpace(json) ? new LocalProfileRecord() : LocalProfileRecord.FromJson(json!);
+            var profile = string.IsNullOrWhiteSpace(json) ? CreateBlankProfile(settings) : LocalProfileRecord.FromJson(json!);
+            ApplySettingsToProfile(profile, settings);
+            return profile;
+        }
+
+        private static LocalProfileRecord CreateBlankProfile(PersistlyGameSavesSettings settings)
+        {
+            var profile = new LocalProfileRecord();
+            ApplySettingsToProfile(profile, settings);
+            return profile;
+        }
+
+        private static LocalProfileRecord CreateClearedProfile(PersistlyGameSavesSettings settings)
+        {
+            var profile = new LocalProfileRecord
+            {
+                PlayerRef = string.IsNullOrWhiteSpace(settings.PlayerRef) ? null : settings.PlayerRef!.Trim(),
+                ExternalProfileRefJson = string.IsNullOrWhiteSpace(settings.ExternalProfileRefJson) ? null : PersistlyJson.CanonicalizeObjectJson(settings.ExternalProfileRefJson!, "externalProfileRef"),
+                SyncPolicy = settings.SyncPolicy ?? DefaultSyncPolicy
+            };
+            return profile;
+        }
+
+        private static void ApplySettingsToProfile(LocalProfileRecord profile, PersistlyGameSavesSettings settings)
+        {
             if (!string.IsNullOrWhiteSpace(settings.ProfileSaveId))
             {
                 profile.ProfileSaveId = settings.ProfileSaveId!.Trim();
@@ -1275,7 +1600,6 @@ namespace Persistly.Unity
             profile.PlayerRef = string.IsNullOrWhiteSpace(settings.PlayerRef) ? profile.PlayerRef : settings.PlayerRef!.Trim();
             profile.ExternalProfileRefJson = string.IsNullOrWhiteSpace(settings.ExternalProfileRefJson) ? profile.ExternalProfileRefJson : PersistlyJson.CanonicalizeObjectJson(settings.ExternalProfileRefJson!, "externalProfileRef");
             profile.SyncPolicy = settings.SyncPolicy ?? profile.SyncPolicy ?? DefaultSyncPolicy;
-            return profile;
         }
 
         private static string ResolveLocalProfileKey(PersistlyGameSavesSettings settings, IPersistlyGameSavesStore store)

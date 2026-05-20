@@ -236,6 +236,63 @@ namespace Persistly.Unity
         public PersistlyProfileState ProfileState => PersistlyProfileState.Parse(Profile.StateJson);
     }
 
+    public sealed class PersistlyDeleteProfileResponse
+    {
+        public PersistlyDeleteProfileResponse(string profileSaveId, DateTimeOffset deletedAt, int deletedCharacterCount, bool alreadyDeleted, bool cleanupQueued)
+        {
+            ProfileSaveId = profileSaveId;
+            DeletedAt = deletedAt;
+            DeletedCharacterCount = deletedCharacterCount;
+            AlreadyDeleted = alreadyDeleted;
+            CleanupQueued = cleanupQueued;
+        }
+
+        public string ProfileSaveId { get; }
+
+        public DateTimeOffset DeletedAt { get; }
+
+        public int DeletedCharacterCount { get; }
+
+        public bool AlreadyDeleted { get; }
+
+        public bool CleanupQueued { get; }
+    }
+
+    public sealed class PersistlyDeleteProfileCharacterResponse
+    {
+        public PersistlyDeleteProfileCharacterResponse(
+            string profileSaveId,
+            string characterSaveId,
+            DateTimeOffset deletedAt,
+            bool alreadyDeleted,
+            bool cleanupQueued,
+            string? slotKey = null,
+            PersistlySave? profile = null)
+        {
+            ProfileSaveId = profileSaveId;
+            CharacterSaveId = characterSaveId;
+            DeletedAt = deletedAt;
+            AlreadyDeleted = alreadyDeleted;
+            CleanupQueued = cleanupQueued;
+            SlotKey = slotKey;
+            Profile = profile;
+        }
+
+        public string ProfileSaveId { get; }
+
+        public string CharacterSaveId { get; }
+
+        public DateTimeOffset DeletedAt { get; }
+
+        public bool AlreadyDeleted { get; }
+
+        public bool CleanupQueued { get; }
+
+        public string? SlotKey { get; }
+
+        public PersistlySave? Profile { get; }
+    }
+
     public sealed class PersistlySyncPolicy
     {
         public PersistlySyncPolicy(
