@@ -314,12 +314,12 @@ namespace Persistly.Unity
 
             if (response.StatusCode == 200)
             {
-                PersistlySave cachedSave;
-                _cache.TryGet(characterSaveId, out cachedSave);
+                PersistlySave acceptedCachedSave;
+                _cache.TryGet(characterSaveId, out acceptedCachedSave);
                 var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
                 var accepted = BuildAcceptedSyncResponse(
                     acceptedPayload,
-                    acceptedPayload.Save ?? SynthesizeSave(characterSaveId, cachedSave, request.MetadataJson, request.StateJson));
+                    acceptedPayload.Save ?? SynthesizeSave(characterSaveId, acceptedCachedSave, request.MetadataJson, request.StateJson));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -450,12 +450,12 @@ namespace Persistly.Unity
 
             if (response.StatusCode == 200)
             {
-                PersistlySave cachedSave;
-                _cache.TryGet(saveId, out cachedSave);
+                PersistlySave acceptedCachedSave;
+                _cache.TryGet(saveId, out acceptedCachedSave);
                 var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
                 var accepted = BuildAcceptedSyncResponse(
                     acceptedPayload,
-                    acceptedPayload.Save ?? SynthesizeSave(saveId, cachedSave, request.MetadataJson, request.StateJson));
+                    acceptedPayload.Save ?? SynthesizeSave(saveId, acceptedCachedSave, request.MetadataJson, request.StateJson));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -741,9 +741,16 @@ namespace Persistly.Unity
         {
             var configJson = "{}";
             Dictionary<string, object?>? config;
-            if (TryGetObject(gameConfig, "config", out config))
+            if (TryGetObject(gameConfig, "data", out config) || TryGetObject(gameConfig, "config", out config))
             {
                 configJson = PersistlyJson.Serialize(config);
+            }
+
+            var hasData = GetOptionalBool(gameConfig, "hasData") ?? (config != null && config.Count > 0);
+            var eventName = GetOptionalString(gameConfig, "eventName");
+            if (eventName == null && config != null)
+            {
+                eventName = GetOptionalString(config, "eventName");
             }
 
             return new PersistlyRuntimeGameConfig(
@@ -751,8 +758,8 @@ namespace Persistly.Unity
                 GetOptionalInt(gameConfig, "version"),
                 GetOptionalBool(gameConfig, "unchanged") ?? false,
                 GetOptionalInt(gameConfig, "sizeBytes"),
-                GetOptionalBool(gameConfig, "hasData") ?? false,
-                GetOptionalString(gameConfig, "eventName"),
+                hasData,
+                eventName,
                 configJson);
         }
 
@@ -894,6 +901,12 @@ namespace Persistly.Unity
             var merged = new Dictionary<string, object?>(existing);
             foreach (var pair in patch)
             {
+                if (pair.Value == null)
+                {
+                    merged.Remove(pair.Key);
+                    continue;
+                }
+
                 merged[pair.Key] = pair.Value;
             }
 
@@ -1014,6 +1027,46 @@ namespace Persistly.Unity
                         return new PersistlyArchivedCharacterError(statusCode, message, characterSaveId, detailsJson);
                     }
 
+                    if (code == PersistlyErrorCode.ProfileDeleted)
+                    {
+                        string? profileSaveId = null;
+                        Dictionary<string, object?>? details;
+                        if (TryGetObject(error, "details", out details) && details != null)
+                        {
+                            profileSaveId = GetOptionalString(details, "profileSaveId");
+                        }
+
+                        return new PersistlyProfileDeletedError(statusCode, message, profileSaveId, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.CharacterDeleted)
+                    {
+                        string? characterSaveId = null;
+                        Dictionary<string, object?>? details;
+                        if (TryGetObject(error, "details", out details) && details != null)
+                        {
+                            characterSaveId = GetOptionalString(details, "characterSaveId");
+                        }
+
+                        return new PersistlyCharacterDeletedError(statusCode, message, characterSaveId, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.MonthlyQuotaExceeded)
+                    {
+                        string? planTier = null;
+                        long? used = null;
+                        long? limit = null;
+                        Dictionary<string, object?>? details;
+                        if (TryGetObject(error, "details", out details) && details != null)
+                        {
+                            planTier = GetOptionalString(details, "planTier");
+                            used = GetOptionalLong(details, "used");
+                            limit = GetOptionalLong(details, "limit");
+                        }
+
+                        return new PersistlyMonthlyQuotaExceededError(statusCode, message, planTier, used, limit, detailsJson);
+                    }
+
                     if (code == PersistlyErrorCode.PayloadTooLarge)
                     {
                         string? field = null;
@@ -1053,8 +1106,14 @@ namespace Persistly.Unity
                     return new PersistlySlotAlreadyExistsError(statusCode, message, null, detailsJson);
                 case PersistlyErrorCode.CharacterArchived:
                     return new PersistlyArchivedCharacterError(statusCode, message, null, detailsJson);
+                case PersistlyErrorCode.ProfileDeleted:
+                    return new PersistlyProfileDeletedError(statusCode, message, null, detailsJson);
+                case PersistlyErrorCode.CharacterDeleted:
+                    return new PersistlyCharacterDeletedError(statusCode, message, null, detailsJson);
                 case PersistlyErrorCode.RateLimited:
                     return new PersistlyRateLimitedError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.MonthlyQuotaExceeded:
+                    return new PersistlyMonthlyQuotaExceededError(statusCode, message, null, null, null, detailsJson);
                 case PersistlyErrorCode.PayloadTooLarge:
                     return new PersistlyPayloadTooLargeError(statusCode, message, null, null, detailsJson);
                 case PersistlyErrorCode.ServerError:
@@ -1081,8 +1140,14 @@ namespace Persistly.Unity
                     return PersistlyErrorCode.SlotAlreadyExists;
                 case "character_archived":
                     return PersistlyErrorCode.CharacterArchived;
+                case "profile_deleted":
+                    return PersistlyErrorCode.ProfileDeleted;
+                case "character_deleted":
+                    return PersistlyErrorCode.CharacterDeleted;
                 case "rate_limited":
                     return PersistlyErrorCode.RateLimited;
+                case "monthly_quota_exceeded":
+                    return PersistlyErrorCode.MonthlyQuotaExceeded;
                 case "payload_too_large":
                     return PersistlyErrorCode.PayloadTooLarge;
                 case "server_error":
@@ -1122,6 +1187,11 @@ namespace Persistly.Unity
             if (statusCode == 413)
             {
                 return PersistlyErrorCode.PayloadTooLarge;
+            }
+
+            if (statusCode == 402)
+            {
+                return PersistlyErrorCode.MonthlyQuotaExceeded;
             }
 
             if (statusCode == 429)
@@ -1289,6 +1359,17 @@ namespace Persistly.Unity
             return ConvertToInt(property, propertyName);
         }
 
+        private static long? GetOptionalLong(Dictionary<string, object?> element, string propertyName)
+        {
+            object? property;
+            if (!element.TryGetValue(propertyName, out property) || property == null)
+            {
+                return null;
+            }
+
+            return ConvertToLong(property, propertyName);
+        }
+
         private static int ConvertToInt(object value, string label)
         {
             if (value is long longValue)
@@ -1310,6 +1391,32 @@ namespace Persistly.Unity
                 }
 
                 return checked((int)rounded);
+            }
+
+            throw new PersistlyConfigurationError(label + " must be an integer.");
+        }
+
+        private static long ConvertToLong(object value, string label)
+        {
+            if (value is long longValue)
+            {
+                return longValue;
+            }
+
+            if (value is int intValue)
+            {
+                return intValue;
+            }
+
+            if (value is double doubleValue)
+            {
+                var rounded = Math.Round(doubleValue);
+                if (Math.Abs(doubleValue - rounded) > 0.00001d)
+                {
+                    throw new PersistlyConfigurationError(label + " must be an integer.");
+                }
+
+                return checked((long)rounded);
             }
 
             throw new PersistlyConfigurationError(label + " must be an integer.");

@@ -5,9 +5,10 @@ Unity runtime SDK for Persistly profile-backed, local-first game saves.
 The recommended Unity flow is facade-first:
 
 1. Configure `PersistlyGameSaves` once with a runtime key and optional restore identifiers.
-2. Save and load named slots locally through `PersistlyGameSaves.Shared`.
-3. Call `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueProfileAsync` from explicit lifecycle/safe-sync points.
-4. Use `PersistlyClient` directly only for advanced runtime API access.
+2. For one-save games, use `SaveDataAsync` and `LoadDataAsync`.
+3. For manual saves or characters, use named slots through `SaveSlotAsync` and `LoadSlotAsync`.
+4. Call `ForceSyncDataAsync`, `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueProfileAsync` from explicit lifecycle/safe-sync points.
+5. Use `PersistlyClient` directly only for advanced runtime API access.
 
 This package is `1.0.0` and pins `persistly-contract-v0.3.0`.
 
@@ -39,7 +40,7 @@ await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_
     Store = new FilePersistlyGameSavesStore(Application.persistentDataPath)
 });
 
-await PersistlyGameSaves.Shared.SaveSlotAsync("autosave", new PlayerSaveState
+await PersistlyGameSaves.Shared.SaveDataAsync(new PlayerSaveState
 {
     Gold = 120,
     Level = 2
@@ -48,21 +49,21 @@ await PersistlyGameSaves.Shared.SaveSlotAsync("autosave", new PlayerSaveState
     MetadataJson = "{\"characterName\":\"Ayla\"}"
 });
 
-var loaded = await PersistlyGameSaves.Shared.LoadSlotAsync<PlayerSaveState>("autosave");
+var loaded = await PersistlyGameSaves.Shared.LoadDataAsync<PlayerSaveState>();
 if (loaded.Status == PersistlySlotStatus.LocalFound)
 {
     var state = loaded.State;
 }
 
-var sync = await PersistlyGameSaves.Shared.ForceSyncAsync("autosave");
+var sync = await PersistlyGameSaves.Shared.ForceSyncDataAsync();
 if (sync.Status == PersistlySlotStatus.Conflict)
 {
-    var inspect = PersistlyGameSaves.Shared.InspectSlot("autosave");
+    var inspect = PersistlyGameSaves.Shared.InspectData();
     // inspect.StateJson is local gameplay state; inspect.CloudStateJson is the canonical cloud version.
 }
 
-// After restoring a profile session on another device, pull the named cloud slot.
-var refreshed = await PersistlyGameSaves.Shared.RefreshSlotAsync("autosave");
+// After restoring a profile session on another device, pull the default cloud slot.
+var refreshed = await PersistlyGameSaves.Shared.RefreshDataAsync();
 
 [System.Serializable]
 public sealed class PlayerSaveState
@@ -72,7 +73,7 @@ public sealed class PlayerSaveState
 }
 ```
 
-`SaveSlotAsync` writes local gameplay state immediately and guarantees a local profile envelope exists. The first `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueAsync` call creates the remote Persistly profile and the matching character slot if needed.
+`SaveDataAsync` writes local gameplay state immediately to the default `autosave` slot and guarantees a local profile envelope exists. The first `ForceSyncDataAsync`, `SyncDueSlotsAsync`, or `SyncDueAsync` call creates the remote Persistly profile and the matching character slot if needed.
 
 ## Profiles And Restore
 
@@ -153,6 +154,8 @@ Profile account-data sync preserves server-owned `characterSlots`; it never rewr
 
 Use named slots for gameplay saves:
 
+- `DefaultSlotKey` is `autosave`.
+- `SaveDataAsync`, `LoadDataAsync`, `InspectData`, `RefreshDataAsync`, `ForceSyncDataAsync`, `AcceptCloudDataAsync`, `OverwriteCloudDataAsync`, and `KeepLocalDataForLaterAsync` are convenience aliases for one-save games.
 - `SaveSlotAsync` writes local state immediately.
 - `LoadSlotAsync`, `ListSlots`, and `InspectSlot` are local-only.
 - `ForceSyncAsync` syncs one slot and respects manual cooldown unless `BypassCooldown` is set.
@@ -165,6 +168,9 @@ Use named slots for gameplay saves:
 
 Conflicts keep local and cloud state separate. Local gameplay state is never overwritten automatically. Use:
 
+- `AcceptCloudDataAsync`
+- `OverwriteCloudDataAsync`
+- `KeepLocalDataForLaterAsync`
 - `AcceptCloudVersionAsync`
 - `OverwriteCloudVersionAsync`
 - `KeepLocalForLaterAsync`

@@ -23,7 +23,7 @@ namespace Persistly.Unity.Examples
                 Store = new FilePersistlyGameSavesStore(Application.persistentDataPath)
             });
 
-            await PersistlyGameSaves.Shared.SaveSlotAsync("autosave", new MinimalSaveState
+            await PersistlyGameSaves.Shared.SaveDataAsync(new MinimalSaveState
             {
                 Gold = 120,
                 Level = 2
@@ -32,10 +32,10 @@ namespace Persistly.Unity.Examples
                 MetadataJson = "{\"characterName\":\"Ayla\"}"
             });
 
-            var local = await PersistlyGameSaves.Shared.LoadSlotAsync<MinimalSaveState>("autosave");
+            var local = await PersistlyGameSaves.Shared.LoadDataAsync<MinimalSaveState>();
             Debug.Log("Loaded local level " + local.State.Level);
 
-            var sync = await PersistlyGameSaves.Shared.ForceSyncAsync("autosave");
+            var sync = await PersistlyGameSaves.Shared.ForceSyncDataAsync();
             Debug.Log("Sync status: " + sync.Status.ToString());
         }
 

@@ -68,6 +68,37 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
+        public async Task DataConvenienceMethodsUseDefaultAutosaveSlot()
+        {
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184"
+            });
+
+            var saved = await PersistlyGameSaves.Shared.SaveDataAsync(new TestSaveState
+            {
+                Level = 4,
+                Gold = 70
+            }, new PersistlySaveSlotOptions
+            {
+                MetadataJson = "{\"name\":\"Ayla\"}"
+            });
+            var loaded = await PersistlyGameSaves.Shared.LoadDataAsync<TestSaveState>();
+            var inspect = PersistlyGameSaves.Shared.InspectData();
+
+            Assert.That(PersistlyGameSaves.DefaultSlotKey, Is.EqualTo("autosave"));
+            Assert.That(saved.Status, Is.EqualTo(PersistlySlotStatus.LocalSaved));
+            Assert.That(saved.SlotKey, Is.EqualTo("autosave"));
+            Assert.That(loaded.Status, Is.EqualTo(PersistlySlotStatus.LocalFound));
+            Assert.That(loaded.SlotKey, Is.EqualTo("autosave"));
+            Assert.That(loaded.State.Level, Is.EqualTo(4));
+            Assert.That(loaded.State.Gold, Is.EqualTo(70));
+            Assert.That(inspect.Exists, Is.True);
+            Assert.That(inspect.SlotKey, Is.EqualTo("autosave"));
+            Assert.That(inspect.MetadataJson, Does.Contain("\"name\":\"Ayla\""));
+        }
+
+        [Test]
         public async Task LoadSlotReturnsTypedNotFoundInsteadOfThrowing()
         {
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
@@ -327,7 +358,6 @@ namespace Persistly.Unity.LastBeacon.Tests
         public async Task ForceSyncReconcilesExistingRemoteSlotWhenLocalCharacterIdIsMissing()
         {
             var transport = new QueueTransport(
-                new PersistlyTransportResponse(409, "{\"error\":{\"code\":\"slot_already_exists\",\"message\":\"An active character already exists for this slot key.\"}}"),
                 new PersistlyTransportResponse(200, "{\"profileSaveId\":\"sv_profile\",\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[{\"slotKey\":\"autosave\",\"characterSaveId\":\"sv_char\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"},\"name\":\"Cloud\"}}]},\"version\":2,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:02:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"),
                 new PersistlyTransportResponse(200, "{\"save\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"},\"name\":\"Cloud\"},\"state\":{\"Level\":1,\"Gold\":10},\"version\":2,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:02:00Z\"}}"),
                 new PersistlyTransportResponse(200, "{\"status\":\"accepted\",\"save\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"},\"name\":\"Local\"},\"state\":{\"Level\":3,\"Gold\":30},\"version\":3,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:03:00Z\"}}"));
@@ -348,9 +378,9 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(result.Status, Is.EqualTo(PersistlySlotStatus.Synced));
             Assert.That(inspect.CharacterSaveId, Is.EqualTo("sv_char"));
             Assert.That(inspect.Version, Is.EqualTo(3));
-            Assert.That(transport.Requests.Count, Is.EqualTo(4));
-            Assert.That(transport.Requests[3].Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char/sync"));
-            Assert.That(transport.Requests[3].Body, Does.Contain("\"Level\":3"));
+            Assert.That(transport.Requests.Count, Is.EqualTo(3));
+            Assert.That(transport.Requests[2].Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char/sync"));
+            Assert.That(transport.Requests[2].Body, Does.Contain("\"Level\":3"));
         }
 
         [Test]
@@ -385,6 +415,17 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(result.Conflict.LocalVersion, Is.EqualTo(4));
             Assert.That(result.Conflict.CloudVersion, Is.EqualTo(5));
             Assert.That(callback.Conflict.CloudMetadataJson, Does.Contain("\"name\":\"Cloud\""));
+
+            var kept = await PersistlyGameSaves.Shared.KeepLocalDataForLaterAsync();
+            var afterKeep = PersistlyGameSaves.Shared.InspectData();
+            var accepted = await PersistlyGameSaves.Shared.AcceptCloudDataAsync();
+            var loaded = await PersistlyGameSaves.Shared.LoadDataAsync<TestSaveState>();
+
+            Assert.That(kept.Status, Is.EqualTo(PersistlySlotStatus.LocalSaved));
+            Assert.That(afterKeep.Dirty, Is.True);
+            Assert.That(accepted.Status, Is.EqualTo(PersistlySlotStatus.Synced));
+            Assert.That(loaded.State.Level, Is.EqualTo(9));
+            Assert.That(loaded.Dirty, Is.False);
         }
 
         [Test]
@@ -439,7 +480,8 @@ namespace Persistly.Unity.LastBeacon.Tests
         {
             var transport = new QueueTransport(
                 new PersistlyTransportResponse(200, "{\"profileSaveId\":\"sv_profile\",\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[{\"slotKey\":\"autosave\",\"characterSaveId\":\"sv_char\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}}}]},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"),
-                new PersistlyTransportResponse(201, "{\"profileSaveId\":\"sv_profile\",\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[{\"slotKey\":\"autosave\",\"characterSaveId\":\"sv_char\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}}}]},\"version\":2,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:01:00Z\"},\"character\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}},\"state\":{\"Level\":1,\"Gold\":10},\"version\":1,\"createdAt\":\"2026-04-10T00:01:00Z\",\"updatedAt\":\"2026-04-10T00:01:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"),
+                new PersistlyTransportResponse(200, "{\"save\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}},\"state\":{\"Level\":1,\"Gold\":10},\"version\":1,\"createdAt\":\"2026-04-10T00:01:00Z\",\"updatedAt\":\"2026-04-10T00:01:00Z\"}}"),
+                new PersistlyTransportResponse(200, "{\"status\":\"accepted\",\"save\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}},\"state\":{\"Level\":1,\"Gold\":10},\"version\":2,\"createdAt\":\"2026-04-10T00:01:00Z\",\"updatedAt\":\"2026-04-10T00:02:00Z\"}}"),
                 new PersistlyTransportResponse(200, "{\"profileSaveId\":\"sv_profile\",\"characterSaveId\":\"sv_char\",\"slotKey\":\"autosave\",\"deletedAt\":\"2026-04-10T00:02:00Z\",\"alreadyDeleted\":false,\"cleanupQueued\":true,\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[]},\"version\":3,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:02:00Z\"}}"));
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
             {
@@ -463,8 +505,8 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(deleted.Status, Is.EqualTo(PersistlySlotStatus.Synced));
             Assert.That(deleted.Warnings, Does.Contain("delete_cleanup_queued"));
             Assert.That(deletedLoad.Found, Is.False);
-            Assert.That(transport.Requests[2].Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char"));
-            Assert.That(transport.Requests[2].Method, Is.EqualTo("DELETE"));
+            Assert.That(transport.Requests[3].Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char"));
+            Assert.That(transport.Requests[3].Method, Is.EqualTo("DELETE"));
             Assert.That(localDeleted.Status, Is.EqualTo(PersistlySlotStatus.LocalSaved));
             Assert.That(localLoad.Found, Is.False);
         }
@@ -475,7 +517,8 @@ namespace Persistly.Unity.LastBeacon.Tests
             var store = new InMemoryPersistlyGameSavesStore();
             var transport = new QueueTransport(
                 new PersistlyTransportResponse(200, "{\"profileSaveId\":\"sv_profile\",\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[{\"slotKey\":\"autosave\",\"characterSaveId\":\"sv_char\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}}}]},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"),
-                new PersistlyTransportResponse(201, "{\"profileSaveId\":\"sv_profile\",\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[{\"slotKey\":\"autosave\",\"characterSaveId\":\"sv_char\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}}}]},\"version\":2,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:01:00Z\"},\"character\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}},\"state\":{\"Level\":1,\"Gold\":10},\"version\":1,\"createdAt\":\"2026-04-10T00:01:00Z\",\"updatedAt\":\"2026-04-10T00:01:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"),
+                new PersistlyTransportResponse(200, "{\"save\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}},\"state\":{\"Level\":1,\"Gold\":10},\"version\":1,\"createdAt\":\"2026-04-10T00:01:00Z\",\"updatedAt\":\"2026-04-10T00:01:00Z\"}}"),
+                new PersistlyTransportResponse(200, "{\"status\":\"accepted\",\"save\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}},\"state\":{\"Level\":1,\"Gold\":10},\"version\":2,\"createdAt\":\"2026-04-10T00:01:00Z\",\"updatedAt\":\"2026-04-10T00:02:00Z\"}}"),
                 new PersistlyTransportResponse(200, "{\"profileSaveId\":\"sv_profile\",\"deletedAt\":\"2026-04-10T00:02:00Z\",\"deletedCharacterCount\":1,\"alreadyDeleted\":false,\"cleanupQueued\":true}"));
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
             {
@@ -499,8 +542,8 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(hiddenSession.ProfileSessionToken, Is.Null.Or.Empty);
             Assert.That(missing.Found, Is.False);
             Assert.That(store.LoadProfileJson("player-184"), Is.Null);
-            Assert.That(transport.Requests[2].Url, Does.EndWith("/api/v1/profiles/sv_profile"));
-            Assert.That(transport.Requests[2].Method, Is.EqualTo("DELETE"));
+            Assert.That(transport.Requests[3].Url, Does.EndWith("/api/v1/profiles/sv_profile"));
+            Assert.That(transport.Requests[3].Method, Is.EqualTo("DELETE"));
 
             ResetSharedFacade();
             var localStore = new InMemoryPersistlyGameSavesStore();

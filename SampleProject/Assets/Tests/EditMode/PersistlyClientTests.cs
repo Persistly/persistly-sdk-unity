@@ -97,6 +97,39 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
+        public async Task LightweightProfileAccountDataPatchDeletesNullKeysInSynthesizedCache()
+        {
+            var cache = new InMemoryPersistlySaveCache();
+            cache.Store(new PersistlySave(
+                "sv_profile",
+                "player-184",
+                "{}",
+                "{\"schema\":\"persistly.profile.v1\",\"accountData\":{\"diamonds\":20,\"oldKey\":\"remove-me\"},\"characterSlots\":[]}",
+                1,
+                System.DateTimeOffset.Parse("2026-04-10T00:00:00Z"),
+                System.DateTimeOffset.Parse("2026-04-10T00:00:00Z")));
+            var transport = new RecordingTransport(
+                200,
+                "{\"status\":\"accepted\",\"version\":2,\"updatedAt\":\"2026-04-10T00:02:00Z\",\"historyRetained\":true}");
+            var client = new PersistlyClient(new PersistlyClientOptions("http://127.0.0.1:8080", "ps_test_example")
+            {
+                Transport = transport,
+                Cache = cache,
+            });
+
+            var result = await client.SyncProfileAccountDataAsync(
+                "sv_profile",
+                "pst_profile_session",
+                new PersistlySyncProfileAccountDataRequest(1, accountDataPatchJson: "{\"diamonds\":30,\"oldKey\":null}"));
+
+            Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Accepted));
+            Assert.That(result.Save.StateJson, Does.Contain("\"diamonds\":30"));
+            Assert.That(result.Save.StateJson, Does.Not.Contain("oldKey"));
+            Assert.That(client.TryGetLocal("sv_profile", out var cached), Is.True);
+            Assert.That(cached.StateJson, Does.Not.Contain("oldKey"));
+        }
+
+        [Test]
         public async Task ArchiveProfileCharacterUsesArchiveRouteAndCachesReturnedProfile()
         {
             var transport = new RecordingTransport(
@@ -191,7 +224,7 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
-        public void SlotAlreadyExistsAndArchivedCharacterUseTypedErrors()
+        public void ContractErrorsUseTypedErrors()
         {
             Assert.That(
                 PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"slot_already_exists\",\"message\":\"Duplicate slot.\",\"details\":{\"slotKey\":\"autosave\"}}}"),
@@ -199,6 +232,15 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(
                 PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"character_archived\",\"message\":\"Archived.\",\"details\":{\"characterSaveId\":\"sv_char\"}}}"),
                 Is.TypeOf<PersistlyArchivedCharacterError>());
+            Assert.That(
+                PersistlyClient.ParseErrorForTests(410, "{\"error\":{\"code\":\"profile_deleted\",\"message\":\"Profile was deleted.\",\"details\":{\"profileSaveId\":\"sv_profile\"}}}"),
+                Is.TypeOf<PersistlyProfileDeletedError>());
+            Assert.That(
+                PersistlyClient.ParseErrorForTests(410, "{\"error\":{\"code\":\"character_deleted\",\"message\":\"Character was deleted.\",\"details\":{\"characterSaveId\":\"sv_char\"}}}"),
+                Is.TypeOf<PersistlyCharacterDeletedError>());
+            Assert.That(
+                PersistlyClient.ParseErrorForTests(402, "{\"error\":{\"code\":\"monthly_quota_exceeded\",\"message\":\"Monthly runtime request quota exceeded.\",\"details\":{\"planTier\":\"free\",\"used\":100000,\"limit\":100000}}}"),
+                Is.TypeOf<PersistlyMonthlyQuotaExceededError>());
         }
 
         [Test]
@@ -206,7 +248,7 @@ namespace Persistly.Unity.LastBeacon.Tests
         {
             var transport = new RecordingTransport(
                 200,
-                "{\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25},\"gameConfig\":{\"enabled\":true,\"version\":3,\"sizeBytes\":37,\"hasData\":true,\"eventName\":\"launch\",\"config\":{\"season\":\"spring\"}}}");
+                "{\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25},\"gameConfig\":{\"enabled\":true,\"version\":3,\"sizeBytes\":37,\"data\":{\"season\":\"spring\",\"eventName\":\"launch\"}}}");
             var client = BuildClient(transport);
 
             var config = await client.GetRuntimeConfigAsync(gameConfigVersion: 2);
@@ -219,6 +261,8 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(config.GameConfig, Is.Not.Null);
             Assert.That(config.GameConfig!.Enabled, Is.True);
             Assert.That(config.GameConfig.Version, Is.EqualTo(3));
+            Assert.That(config.GameConfig.HasData, Is.True);
+            Assert.That(config.GameConfig.EventName, Is.EqualTo("launch"));
             Assert.That(config.GameConfig.ConfigJson, Does.Contain("\"season\":\"spring\""));
         }
 

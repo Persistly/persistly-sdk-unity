@@ -522,6 +522,8 @@ namespace Persistly.Unity
 
     public sealed class PersistlyGameSaves
     {
+        public const string DefaultSlotKey = "autosave";
+
         private const string ProfileSchema = "persistly.local.profile.v1";
         private const string SlotSchema = "persistly.local.slot.v1";
         private const string AnonymousNamespaceSchema = "persistly.local.anonymous.v1";
@@ -790,6 +792,31 @@ namespace Persistly.Unity
             return ForceSyncProfileAsync(new PersistlySyncOptions { BypassCooldown = true }, cancellationToken);
         }
 
+        public Task<PersistlySlotResult> SaveDataAsync<TState>(TState state, PersistlySaveSlotOptions? options = null)
+        {
+            return SaveSlotAsync(DefaultSlotKey, state, options);
+        }
+
+        public Task<PersistlySlotResult<TState>> LoadDataAsync<TState>() where TState : class
+        {
+            return LoadSlotAsync<TState>(DefaultSlotKey);
+        }
+
+        public PersistlySlotInspection InspectData()
+        {
+            return InspectSlot(DefaultSlotKey);
+        }
+
+        public Task<PersistlySlotResult> RefreshDataAsync(CancellationToken cancellationToken = default)
+        {
+            return RefreshSlotAsync(DefaultSlotKey, cancellationToken);
+        }
+
+        public Task<PersistlySlotResult> ForceSyncDataAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            return ForceSyncAsync(DefaultSlotKey, options, cancellationToken);
+        }
+
         public Task<PersistlySlotResult> SaveSlotAsync<TState>(string slotKey, TState state, PersistlySaveSlotOptions? options = null)
         {
             var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
@@ -1002,10 +1029,21 @@ namespace Persistly.Unity
                     }
                 }
 
+                if (!slot.Version.HasValue)
+                {
+                    await ReconcileExistingRemoteSlotAsync(normalizedSlotKey, cancellationToken, restoreProfile: false);
+                }
+
+                var characterSaveId = slot.CharacterSaveId;
+                if (string.IsNullOrWhiteSpace(characterSaveId))
+                {
+                    throw new PersistlyConfigurationError("Slot is missing a remote character id after profile character reconciliation.");
+                }
+
                 var response = await _client.SyncProfileCharacterAsync(
                     _profile.ProfileSaveId!,
                     _profile.ProfileSessionToken!,
-                    slot.CharacterSaveId,
+                    characterSaveId,
                     new PersistlySyncSaveRequest(slot.StateJson, slot.Version, BuildRemoteSlotMetadataJson(slot)),
                     cancellationToken);
                 slot.LastForceSyncAt = DateTimeOffset.UtcNow;
@@ -1199,6 +1237,21 @@ namespace Persistly.Unity
             return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved));
         }
 
+        public Task<PersistlySlotResult> AcceptCloudDataAsync()
+        {
+            return AcceptCloudVersionAsync(DefaultSlotKey);
+        }
+
+        public Task<PersistlySlotResult> KeepLocalDataForLaterAsync()
+        {
+            return KeepLocalForLaterAsync(DefaultSlotKey);
+        }
+
+        public Task<PersistlySlotResult> OverwriteCloudDataAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
+        {
+            return OverwriteCloudVersionAsync(DefaultSlotKey, options, cancellationToken);
+        }
+
         public Task<PersistlySlotResult> AcceptCloudVersionAsync(string slotKey)
         {
             var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
@@ -1214,13 +1267,22 @@ namespace Persistly.Unity
                 slot.Version = slot.CloudVersion;
                 slot.Dirty = false;
                 SaveSlot(slot);
-                return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved));
+                return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced));
             }
         }
 
         public Task<PersistlySlotResult> KeepLocalForLaterAsync(string slotKey)
         {
             var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            lock (_gate)
+            {
+                if (_slots.TryGetValue(normalizedSlotKey, out var slot))
+                {
+                    slot.Dirty = true;
+                    SaveSlot(slot);
+                }
+            }
+
             return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved));
         }
 
@@ -1332,9 +1394,13 @@ namespace Persistly.Unity
             return PersistlyProfileState.Parse(profileStateJson).AccountDataJson;
         }
 
-        private async Task ReconcileExistingRemoteSlotAsync(string slotKey, CancellationToken cancellationToken)
+        private async Task ReconcileExistingRemoteSlotAsync(string slotKey, CancellationToken cancellationToken, bool restoreProfile = true)
         {
-            await RestoreProfileAsync(cancellationToken, preserveLocalDirty: true);
+            if (restoreProfile)
+            {
+                await RestoreProfileAsync(cancellationToken, preserveLocalDirty: true);
+            }
+
             LocalSlotRecord slot;
             lock (_gate)
             {

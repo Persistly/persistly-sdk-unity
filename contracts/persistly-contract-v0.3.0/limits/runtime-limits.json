@@ -57,6 +57,20 @@
       "characterStateMaxBytes": 2097152,
       "metadataMaxBytes": 131072,
       "gameConfigMaxBytes": 131072
+    },
+    "creator_demo": {
+      "monthlyRuntimeRequests": 100000,
+      "prodRuntimeRequestsPerMinute": 100,
+      "stageRuntimeRequestsPerMinute": 30,
+      "burstCapacityRequests": 200,
+      "storageQuotaBytes": 1073741824,
+      "restoreHistoryDays": 1,
+      "normalSnapshotIntervalSeconds": 1800,
+      "maxNormalSnapshotsPerCharacter": 24,
+      "accountDataMaxBytes": 262144,
+      "characterStateMaxBytes": 262144,
+      "metadataMaxBytes": 16384,
+      "gameConfigMaxBytes": 16384
     }
   },
   "errorCodes": [
@@ -65,6 +79,7 @@
     "not_found",
     "conflict",
     "rate_limited",
+    "monthly_quota_exceeded",
     "payload_too_large",
     "server_error"
   ],

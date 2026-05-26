@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path
 import sys
 
 
 ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = ROOT.parents[1]
 BUNDLE = ROOT / "contracts" / "persistly-contract-v0.3.0"
+CANONICAL_BUNDLE = REPO_ROOT / "platform" / "packages" / "contracts" / "bundles" / "persistly-contract-v0.3.0"
 MANIFEST = BUNDLE / "manifest.json"
 
 
@@ -38,6 +41,12 @@ def main() -> int:
         return 1
 
     failures: list[str] = []
+    skip_canonical = os.environ.get("PERSISTLY_SKIP_CANONICAL_CONTRACT") == "1"
+    canonical_enabled = not skip_canonical and CANONICAL_BUNDLE.exists()
+    if not canonical_enabled:
+        reason = "disabled by PERSISTLY_SKIP_CANONICAL_CONTRACT=1" if skip_canonical else f"bundle not found at {CANONICAL_BUNDLE}"
+        print(f"warning: canonical contract comparison skipped; {reason}", file=sys.stderr)
+
     for entry in files:
         if not isinstance(entry, dict):
             failures.append("manifest entry is not an object")
@@ -63,6 +72,15 @@ def main() -> int:
         actual_sha = hashlib.sha256(actual_bytes).hexdigest()
         if actual_sha != expected_sha:
             failures.append(f"sha mismatch: {path} expected {expected_sha} got {actual_sha}")
+
+        if canonical_enabled:
+            canonical_path = CANONICAL_BUNDLE / relative_path
+            if not canonical_path.exists():
+                failures.append(f"missing canonical file: {canonical_path}")
+                continue
+            canonical_sha = sha256(canonical_path)
+            if actual_sha != canonical_sha:
+                failures.append(f"canonical drift: {path} expected canonical sha {canonical_sha} got {actual_sha}")
 
     if failures:
         for failure in failures:

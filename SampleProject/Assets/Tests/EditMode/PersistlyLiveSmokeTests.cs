@@ -56,7 +56,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             });
             Assert.That(account.Status, Is.EqualTo(PersistlyGameSaveStatus.LocalSaved));
 
-            var saved = await PersistlyGameSaves.Shared.SaveSlotAsync("autosave", new LiveSmokeState
+            var saved = await PersistlyGameSaves.Shared.SaveDataAsync(new LiveSmokeState
             {
                 Level = 5,
                 Coins = 1200,
@@ -67,16 +67,17 @@ namespace Persistly.Unity.LastBeacon.Tests
             });
             Assert.That(saved.Status, Is.EqualTo(PersistlySlotStatus.LocalSaved));
 
-            var loaded = await PersistlyGameSaves.Shared.LoadSlotAsync<LiveSmokeState>("autosave");
+            var loaded = await PersistlyGameSaves.Shared.LoadDataAsync<LiveSmokeState>();
             Assert.That(loaded.Status, Is.EqualTo(PersistlySlotStatus.LocalFound));
             Assert.That(loaded.Found, Is.True);
+            Assert.That(loaded.State, Is.Not.Null);
             Assert.That(loaded.State.Level, Is.EqualTo(5));
 
-            var firstSync = await PersistlyGameSaves.Shared.ForceSyncAsync("autosave", new PersistlySyncOptions { BypassCooldown = true });
+            var firstSync = await PersistlyGameSaves.Shared.ForceSyncDataAsync(new PersistlySyncOptions { BypassCooldown = true });
             Assert.That(firstSync.Status, Is.EqualTo(PersistlySlotStatus.Synced));
-            Assert.That(PersistlyGameSaves.Shared.InspectSlot("autosave").CharacterSaveId, Is.Not.Empty);
+            Assert.That(PersistlyGameSaves.Shared.InspectData().CharacterSaveId, Is.Not.Empty);
 
-            await PersistlyGameSaves.Shared.SaveSlotAsync("autosave", new LiveSmokeState
+            await PersistlyGameSaves.Shared.SaveDataAsync(new LiveSmokeState
             {
                 Level = 6,
                 Coins = 1300,

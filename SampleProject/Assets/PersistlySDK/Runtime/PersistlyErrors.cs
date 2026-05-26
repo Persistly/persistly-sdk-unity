@@ -12,7 +12,10 @@ namespace Persistly.Unity
         Conflict,
         SlotAlreadyExists,
         CharacterArchived,
+        ProfileDeleted,
+        CharacterDeleted,
         RateLimited,
+        MonthlyQuotaExceeded,
         PayloadTooLarge,
         ServerError
     }
@@ -120,12 +123,51 @@ namespace Persistly.Unity
         public string? CharacterSaveId { get; }
     }
 
+    public sealed class PersistlyProfileDeletedError : PersistlyApiError
+    {
+        public PersistlyProfileDeletedError(int statusCode, string message, string? profileSaveId, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.ProfileDeleted, message, detailsJson)
+        {
+            ProfileSaveId = profileSaveId;
+        }
+
+        public string? ProfileSaveId { get; }
+    }
+
+    public sealed class PersistlyCharacterDeletedError : PersistlyApiError
+    {
+        public PersistlyCharacterDeletedError(int statusCode, string message, string? characterSaveId, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.CharacterDeleted, message, detailsJson)
+        {
+            CharacterSaveId = characterSaveId;
+        }
+
+        public string? CharacterSaveId { get; }
+    }
+
     public sealed class PersistlyRateLimitedError : PersistlyApiError
     {
         public PersistlyRateLimitedError(int statusCode, string message, string? detailsJson = null)
             : base(statusCode, PersistlyErrorCode.RateLimited, message, detailsJson)
         {
         }
+    }
+
+    public sealed class PersistlyMonthlyQuotaExceededError : PersistlyApiError
+    {
+        public PersistlyMonthlyQuotaExceededError(int statusCode, string message, string? planTier, long? used, long? limit, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.MonthlyQuotaExceeded, message, detailsJson)
+        {
+            PlanTier = planTier;
+            Used = used;
+            Limit = limit;
+        }
+
+        public string? PlanTier { get; }
+
+        public long? Used { get; }
+
+        public long? Limit { get; }
     }
 
     public sealed class PersistlyPayloadTooLargeError : PersistlyApiError
