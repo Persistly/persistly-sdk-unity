@@ -111,7 +111,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             var transport = new RecordingTransport(
                 200,
                 "{\"status\":\"accepted\",\"version\":2,\"updatedAt\":\"2026-04-10T00:02:00Z\",\"historyRetained\":true}");
-            var client = new PersistlyClient(new PersistlyClientOptions("http://127.0.0.1:8080", "ps_test_example")
+            var client = new PersistlyClient(new PersistlyClientOptions("ps_test_example")
             {
                 Transport = transport,
                 Cache = cache,
@@ -161,7 +161,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             var transport = new RecordingTransport(
                 200,
                 "{\"profileSaveId\":\"sv_profile\",\"characterSaveId\":\"sv_char\",\"slotKey\":\"autosave\",\"deletedAt\":\"2026-04-10T00:04:00Z\",\"alreadyDeleted\":false,\"cleanupQueued\":true,\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[]},\"version\":4,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:04:00Z\"}}");
-            var client = new PersistlyClient(new PersistlyClientOptions("http://127.0.0.1:8080", "ps_test_example")
+            var client = new PersistlyClient(new PersistlyClientOptions("ps_test_example")
             {
                 Transport = transport,
                 Cache = cache,
@@ -192,7 +192,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             var transport = new RecordingTransport(
                 200,
                 "{\"profileSaveId\":\"sv_profile\",\"deletedAt\":\"2026-04-10T00:05:00Z\",\"deletedCharacterCount\":2,\"alreadyDeleted\":false,\"cleanupQueued\":true}");
-            var client = new PersistlyClient(new PersistlyClientOptions("http://127.0.0.1:8080", "ps_test_example")
+            var client = new PersistlyClient(new PersistlyClientOptions("ps_test_example")
             {
                 Transport = transport,
                 Cache = cache,
@@ -326,7 +326,7 @@ namespace Persistly.Unity.LastBeacon.Tests
 
         private static PersistlyClient BuildClient(IPersistlyTransport transport)
         {
-            return new PersistlyClient(new PersistlyClientOptions("http://127.0.0.1:8080", "ps_test_example")
+            return new PersistlyClient(new PersistlyClientOptions("ps_test_example")
             {
                 Transport = transport,
             });

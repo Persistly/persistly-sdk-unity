@@ -107,7 +107,6 @@ namespace Persistly.Unity.LastBeacon
         private void DrawConnectionSection()
         {
             GUILayout.Label("Persistly Connection", SectionStyle());
-            _profile.Config.BaseUrl = DrawField("API Base URL", _profile.Config.BaseUrl);
             _profile.Config.RuntimeKey = DrawField("Runtime Key", _profile.Config.RuntimeKey);
             _profile.Config.PlayerRef = DrawField("Player reference", _profile.Config.PlayerRef);
             _profile.Config.CharacterName = DrawField("Character Name", _profile.Config.CharacterName);
@@ -327,14 +326,13 @@ namespace Persistly.Unity.LastBeacon
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(_profile.Config.BaseUrl) || string.IsNullOrWhiteSpace(_profile.Config.RuntimeKey))
+            if (string.IsNullOrWhiteSpace(_profile.Config.RuntimeKey))
             {
-                throw new PersistlyConfigurationError("Persistly Base URL and Runtime Key must be configured first.");
+                throw new PersistlyConfigurationError("Persistly Runtime Key must be configured first.");
             }
 
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings(_profile.Config.RuntimeKey.Trim())
             {
-                BaseUrl = _profile.Config.BaseUrl.Trim(),
                 PlayerRef = NormalizeOptional(_profile.Config.PlayerRef),
                 ProfileSaveId = NormalizeOptional(_profile.ProfileSaveId),
                 ProfileSessionToken = NormalizeOptional(_profile.ProfileSessionToken),

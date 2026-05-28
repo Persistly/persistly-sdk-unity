@@ -19,7 +19,6 @@ namespace Persistly.Unity.LastBeacon.Tests
                 Version = 7,
                 Config = new LastBeaconConfig
                 {
-                    BaseUrl = "http://127.0.0.1:8080",
                     RuntimeKey = "ps_test_example",
                     PlayerRef = "player-184",
                     CharacterName = "Ayla",

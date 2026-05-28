@@ -7,7 +7,9 @@ namespace Persistly.Unity.LastBeacon
     [Serializable]
     public sealed class LastBeaconConfig
     {
-        public string BaseUrl = "https://api.persistly.app";
+        // Legacy persisted field retained so older local config JSON still loads.
+        // Last Beacon uses the SDK default API origin instead of exposing this in UI.
+        public string BaseUrl = global::Persistly.Unity.PersistlyClientOptions.DefaultBaseUrl;
         public string RuntimeKey = string.Empty;
         public string PlayerRef = string.Empty;
         public string CharacterName = "Ayla";
