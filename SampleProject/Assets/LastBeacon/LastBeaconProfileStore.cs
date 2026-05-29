@@ -12,62 +12,62 @@ namespace Persistly.Unity.LastBeacon
         public string BaseUrl = global::Persistly.Unity.PersistlyClientOptions.DefaultBaseUrl;
         public string RuntimeKey = string.Empty;
         public string PlayerRef = string.Empty;
-        public string CharacterName = "Ayla";
+        public string SlotName = "Ayla";
         public string SlotLabel = "Beacon-A";
     }
 
     [Serializable]
-    public sealed class LastBeaconProfile
+    public sealed class LastBeaconAccount
     {
         public LastBeaconConfig Config = new LastBeaconConfig();
-        public string ProfileSaveId = string.Empty;
-        public string ProfileSessionToken = string.Empty;
-        public string CharacterSaveId = string.Empty;
+        public string AccountId = string.Empty;
+        public string AccountSessionToken = string.Empty;
+        public string SlotId = string.Empty;
         public int Version = 0;
         public LastBeaconSaveState State = new LastBeaconSaveState();
     }
 
-    public sealed class LastBeaconProfileStore
+    public sealed class LastBeaconAccountStore
     {
         private readonly string _absolutePath;
 
-        public LastBeaconProfileStore(string fileName = "last_beacon_profile.json")
+        public LastBeaconAccountStore(string fileName = "last_beacon_account.json")
         {
             _absolutePath = Path.Combine(Application.persistentDataPath, fileName);
         }
 
-        public LastBeaconProfile Load()
+        public LastBeaconAccount Load()
         {
             if (!File.Exists(_absolutePath))
             {
-                return new LastBeaconProfile();
+                return new LastBeaconAccount();
             }
 
             var raw = File.ReadAllText(_absolutePath);
             if (string.IsNullOrWhiteSpace(raw))
             {
-                return new LastBeaconProfile();
+                return new LastBeaconAccount();
             }
 
             try
             {
-                return JsonUtility.FromJson<LastBeaconProfile>(raw) ?? new LastBeaconProfile();
+                return JsonUtility.FromJson<LastBeaconAccount>(raw) ?? new LastBeaconAccount();
             }
             catch
             {
-                return new LastBeaconProfile();
+                return new LastBeaconAccount();
             }
         }
 
-        public void Save(LastBeaconProfile profile)
+        public void Save(LastBeaconAccount account)
         {
-            if (profile == null)
+            if (account == null)
             {
-                throw new ArgumentNullException(nameof(profile));
+                throw new ArgumentNullException(nameof(account));
             }
 
             Directory.CreateDirectory(Path.GetDirectoryName(_absolutePath) ?? Application.persistentDataPath);
-            File.WriteAllText(_absolutePath, JsonUtility.ToJson(profile, true));
+            File.WriteAllText(_absolutePath, JsonUtility.ToJson(account, true));
         }
 
         public void Reset()

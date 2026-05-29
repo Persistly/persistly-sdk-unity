@@ -29,7 +29,7 @@ namespace Persistly.Unity.Examples
                 Level = 2
             }, new PersistlySaveSlotOptions
             {
-                MetadataJson = "{\"characterName\":\"Ayla\"}"
+                SlotInfoJson = "{\"slotName\":\"Ayla\"}"
             });
 
             var local = await PersistlyGameSaves.Shared.LoadDataAsync<MinimalSaveState>();

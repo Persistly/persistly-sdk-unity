@@ -8,9 +8,9 @@ namespace Persistly.Unity
 {
     public static class PersistlyJson
     {
-        private const long MetadataMaxBytes = 16384;
+        private const long SlotInfoMaxBytes = 16384;
         private const long StateMaxBytes = 262144;
-        private const string MetadataLabel = "metadata";
+        private const string SlotInfoLabel = "slotInfo";
         private const string StateLabel = "state";
 
         public static string CanonicalizeObjectJson(string json, string label)
@@ -46,11 +46,11 @@ namespace Persistly.Unity
             }
         }
 
-        public static void ValidatePayloadSizes(string? metadataJson, string stateJson)
+        public static void ValidatePayloadSizes(string? slotInfoJson, string stateJson)
         {
-            if (metadataJson != null)
+            if (slotInfoJson != null)
             {
-                EnsureWithinLimit(metadataJson, MetadataLabel, MetadataMaxBytes);
+                EnsureWithinLimit(slotInfoJson, SlotInfoLabel, SlotInfoMaxBytes);
             }
 
             EnsureWithinLimit(stateJson, StateLabel, StateMaxBytes);
@@ -73,7 +73,7 @@ namespace Persistly.Unity
             {
                 throw new PersistlyPayloadTooLargeError(
                     413,
-                    field == StateLabel ? "State exceeds the maximum allowed size." : "Metadata exceeds the maximum allowed size.",
+                    field == StateLabel ? "State exceeds the maximum allowed size." : "SlotInfo exceeds the maximum allowed size.",
                     field,
                     (int)maxBytes);
             }

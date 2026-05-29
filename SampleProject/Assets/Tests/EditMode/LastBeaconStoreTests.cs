@@ -5,23 +5,23 @@ namespace Persistly.Unity.LastBeacon.Tests
     public sealed class LastBeaconStoreTests
     {
         [Test]
-        public void ProfileRoundTripPreservesConfigAndSaveIdentity()
+        public void AccountRoundTripPreservesConfigAndSaveIdentity()
         {
             const string path = "last_beacon_store_test.json";
-            var store = new LastBeaconProfileStore(path);
+            var store = new LastBeaconAccountStore(path);
             store.Reset();
 
-            var profile = new LastBeaconProfile
+            var account = new LastBeaconAccount
             {
-                ProfileSaveId = "sv_profile",
-                ProfileSessionToken = "pst_profile_session",
-                CharacterSaveId = "sv_01HXYZ",
+                AccountId = "acc_account",
+                AccountSessionToken = "pst_account_session",
+                SlotId = "autosave",
                 Version = 7,
                 Config = new LastBeaconConfig
                 {
                     RuntimeKey = "ps_test_example",
                     PlayerRef = "player-184",
-                    CharacterName = "Ayla",
+                    SlotName = "Ayla",
                     SlotLabel = "Beacon-A",
                 },
                 State = new LastBeaconSaveState
@@ -36,14 +36,14 @@ namespace Persistly.Unity.LastBeacon.Tests
                 },
             };
 
-            store.Save(profile);
+            store.Save(account);
             var reloaded = store.Load();
 
-            Assert.That(reloaded.ProfileSaveId, Is.EqualTo("sv_profile"));
-            Assert.That(reloaded.ProfileSessionToken, Is.EqualTo("pst_profile_session"));
-            Assert.That(reloaded.CharacterSaveId, Is.EqualTo("sv_01HXYZ"));
+            Assert.That(reloaded.AccountId, Is.EqualTo("acc_account"));
+            Assert.That(reloaded.AccountSessionToken, Is.EqualTo("pst_account_session"));
+            Assert.That(reloaded.SlotId, Is.EqualTo("autosave"));
             Assert.That(reloaded.Version, Is.EqualTo(7));
-            Assert.That(reloaded.Config.CharacterName, Is.EqualTo("Ayla"));
+            Assert.That(reloaded.Config.SlotName, Is.EqualTo("Ayla"));
             Assert.That(reloaded.State.Workers, Is.EqualTo(4));
 
             store.Reset();

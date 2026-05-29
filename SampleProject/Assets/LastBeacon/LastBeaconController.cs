@@ -7,9 +7,9 @@ using UnityEngine;
 namespace Persistly.Unity.LastBeacon
 {
     [Serializable]
-    public sealed class LastBeaconMetadata
+    public sealed class LastBeaconSlotInfo
     {
-        public string characterName = "Ayla";
+        public string slotName = "Ayla";
         public string slotLabel = "Beacon-A";
         public string build = "unity-last-beacon";
     }
@@ -19,11 +19,11 @@ namespace Persistly.Unity.LastBeacon
         private const float AutoSyncIntervalSeconds = 20f;
         private const float ReferenceWidth = 1440f;
         private const float ReferenceHeight = 900f;
-        private const string SlotKeyFallback = "Beacon-A";
+        private const string SlotIdFallback = "Beacon-A";
 
         private readonly LastBeaconState _state = new LastBeaconState();
-        private LastBeaconProfileStore _store = null!;
-        private LastBeaconProfile _profile = null!;
+        private LastBeaconAccountStore _store = null!;
+        private LastBeaconAccount _account = null!;
         private Task? _pendingTask;
         private float _syncCountdown = AutoSyncIntervalSeconds;
         private string _status = "Configure Persistly and connect to create or resume a save.";
@@ -34,18 +34,18 @@ namespace Persistly.Unity.LastBeacon
         private void Awake()
         {
             Application.targetFrameRate = 60;
-            _store = new LastBeaconProfileStore();
-            _profile = _store.Load();
-            _state.LoadFrom(_profile.State);
-            _status = string.IsNullOrWhiteSpace(_profile.CharacterSaveId)
+            _store = new LastBeaconAccountStore();
+            _account = _store.Load();
+            _state.LoadFrom(_account.State);
+            _status = string.IsNullOrWhiteSpace(_account.SlotId)
                 ? "No synced slot linked yet. Save locally, then sync when ready."
-                : "Stored character saveId found. Connect / Resume loads the local facade slot first.";
+                : "Stored slot saveId found. Connect / Resume loads the local facade slot first.";
         }
 
         private void Update()
         {
             _state.Tick(Time.deltaTime);
-            _profile.State = _state.ToSaveState();
+            _account.State = _state.ToSaveState();
 
             if (_connected && _pendingTask == null)
             {
@@ -61,13 +61,13 @@ namespace Persistly.Unity.LastBeacon
         {
             if (pauseStatus)
             {
-                PersistProfile();
+                PersistAccount();
             }
         }
 
         private void OnApplicationQuit()
         {
-            PersistProfile();
+            PersistAccount();
         }
 
         private void OnGUI()
@@ -107,34 +107,34 @@ namespace Persistly.Unity.LastBeacon
         private void DrawConnectionSection()
         {
             GUILayout.Label("Persistly Connection", SectionStyle());
-            _profile.Config.RuntimeKey = DrawField("Runtime Key", _profile.Config.RuntimeKey);
-            _profile.Config.PlayerRef = DrawField("Player reference", _profile.Config.PlayerRef);
-            _profile.Config.CharacterName = DrawField("Character Name", _profile.Config.CharacterName);
-            _profile.Config.SlotLabel = DrawField("Slot Label", _profile.Config.SlotLabel);
+            _account.Config.RuntimeKey = DrawField("Runtime Key", _account.Config.RuntimeKey);
+            _account.Config.PlayerRef = DrawField("Player reference", _account.Config.PlayerRef);
+            _account.Config.SlotName = DrawField("Slot Name", _account.Config.SlotName);
+            _account.Config.SlotLabel = DrawField("Slot Label", _account.Config.SlotLabel);
             GUILayout.Label("Persistent path: " + Application.persistentDataPath);
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Save Config", GUILayout.Height(32f)))
             {
-                PersistProfile();
+                PersistAccount();
                 _facadeConfigured = false;
                 _status = "Configuration saved locally.";
             }
 
             GUI.enabled = _pendingTask == null;
-            if (GUILayout.Button(string.IsNullOrWhiteSpace(_profile.CharacterSaveId) ? "Save & Sync Slot" : "Connect / Resume", GUILayout.Height(32f)))
+            if (GUILayout.Button(string.IsNullOrWhiteSpace(_account.SlotId) ? "Save & Sync Slot" : "Connect / Resume", GUILayout.Height(32f)))
             {
-                if (string.IsNullOrWhiteSpace(_profile.CharacterSaveId))
+                if (string.IsNullOrWhiteSpace(_account.SlotId))
                 {
-                    BeginTask(CreateProfileAsync, "Saving local slot and syncing through PersistlyGameSaves...");
+                    BeginTask(CreateAccountAsync, "Saving local slot and syncing through PersistlyGameSaves...");
                 }
                 else
                 {
-                    BeginTask(LoadProfileCharacterAsync, "Loading local PersistlyGameSaves slot...");
+                    BeginTask(LoadAccountSlotAsync, "Loading local PersistlyGameSaves slot...");
                 }
             }
 
-            GUI.enabled = !string.IsNullOrWhiteSpace(_profile.CharacterSaveId) && _pendingTask == null;
+            GUI.enabled = !string.IsNullOrWhiteSpace(_account.SlotId) && _pendingTask == null;
             if (GUILayout.Button("Sync Now", GUILayout.Height(32f)))
             {
                 BeginTask(SyncCurrentSaveAsync, "Syncing beacon state...");
@@ -147,9 +147,9 @@ namespace Persistly.Unity.LastBeacon
         private void DrawStatusSection()
         {
             GUILayout.Label("Connection Status", SectionStyle());
-            GUILayout.Label("Profile Save ID: " + (string.IsNullOrWhiteSpace(_profile.ProfileSaveId) ? "(none)" : _profile.ProfileSaveId));
-            GUILayout.Label("Character Save ID: " + (string.IsNullOrWhiteSpace(_profile.CharacterSaveId) ? "(none)" : _profile.CharacterSaveId));
-            GUILayout.Label("Version: " + _profile.Version);
+            GUILayout.Label("Account Save ID: " + (string.IsNullOrWhiteSpace(_account.AccountId) ? "(none)" : _account.AccountId));
+            GUILayout.Label("Slot Save ID: " + (string.IsNullOrWhiteSpace(_account.SlotId) ? "(none)" : _account.SlotId));
+            GUILayout.Label("Version: " + _account.Version);
             GUILayout.Label("Connected: " + (_connected ? "yes" : "no"));
             GUILayout.Label("Auto-sync in: " + Mathf.Max(_syncCountdown, 0f).ToString("0.0") + "s");
             GUILayout.TextArea(_status, GUILayout.MinHeight(84f));
@@ -176,14 +176,14 @@ namespace Persistly.Unity.LastBeacon
             if (GUILayout.Button("Gather Scrap", GUILayout.Height(36f)))
             {
                 _state.Gather();
-                PersistProfile();
+                PersistAccount();
             }
 
             if (GUILayout.Button("Hire Worker (" + _state.WorkerCost() + ")", GUILayout.Height(36f)))
             {
                 if (_state.TryHireWorker())
                 {
-                    PersistProfile();
+                    PersistAccount();
                     _status = "Worker hired. Save locally updated.";
                 }
                 else
@@ -196,7 +196,7 @@ namespace Persistly.Unity.LastBeacon
             {
                 if (_state.TryUpgradeCore())
                 {
-                    PersistProfile();
+                    PersistAccount();
                     _status = "Core upgraded. Sync when ready.";
                 }
                 else
@@ -208,15 +208,15 @@ namespace Persistly.Unity.LastBeacon
 
             GUILayout.Space(8f);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("Reset Local Profile", GUILayout.Height(32f)))
+            if (GUILayout.Button("Reset Local Account", GUILayout.Height(32f)))
             {
                 _store.Reset();
-                _profile = new LastBeaconProfile();
-                _state.LoadFrom(_profile.State);
+                _account = new LastBeaconAccount();
+                _state.LoadFrom(_account.State);
                 _connected = false;
                 _facadeConfigured = false;
                 _syncCountdown = AutoSyncIntervalSeconds;
-                _status = "Local profile reset. Remote save remains untouched.";
+                _status = "Local account reset. Remote save remains untouched.";
             }
 
             if (GUILayout.Button("Reset Countdown", GUILayout.Height(32f)))
@@ -227,37 +227,37 @@ namespace Persistly.Unity.LastBeacon
             GUILayout.EndHorizontal();
         }
 
-        private async Task CreateProfileAsync()
+        private async Task CreateAccountAsync()
         {
             await SaveCurrentSlotLocalAsync();
             await SyncCurrentSaveAsync();
         }
 
-        private async Task LoadProfileCharacterAsync()
+        private async Task LoadAccountSlotAsync()
         {
             await EnsureFacadeAsync();
-            var loaded = await PersistlyGameSaves.Shared.LoadSlotAsync<LastBeaconSaveState>(NormalizeSlotKey(_profile.Config.SlotLabel));
+            var loaded = await PersistlyGameSaves.Shared.LoadSlotAsync<LastBeaconSaveState>(NormalizeSlotId(_account.Config.SlotLabel));
             if (!loaded.Found || loaded.State == null)
             {
                 _status = "No local PersistlyGameSaves slot found. Use Save & Sync Slot to create one.";
                 return;
             }
 
-            _profile.State = loaded.State;
-            _profile.Version = loaded.Version ?? _profile.Version;
-            _profile.CharacterSaveId = loaded.CharacterSaveId ?? _profile.CharacterSaveId;
-            _state.LoadFrom(_profile.State);
+            _account.State = loaded.State;
+            _account.Version = loaded.Version ?? _account.Version;
+            _account.SlotId = loaded.SlotId ?? _account.SlotId;
+            _state.LoadFrom(_account.State);
             _connected = true;
             _syncCountdown = AutoSyncIntervalSeconds;
-            RefreshProfileSessionAndSlotInspection();
+            RefreshAccountSessionAndSlotInspection();
             _status = "Loaded local slot from PersistlyGameSaves. Remote state was not imported automatically.";
         }
 
         private async Task SyncCurrentSaveAsync()
         {
             await SaveCurrentSlotLocalAsync();
-            var sync = await PersistlyGameSaves.Shared.ForceSyncAsync(NormalizeSlotKey(_profile.Config.SlotLabel));
-            RefreshProfileSessionAndSlotInspection();
+            var sync = await PersistlyGameSaves.Shared.ForceSyncAsync(NormalizeSlotId(_account.Config.SlotLabel));
+            RefreshAccountSessionAndSlotInspection();
             _connected = sync.Status == PersistlySlotStatus.Synced || sync.Status == PersistlySlotStatus.NoChanges || sync.Status == PersistlySlotStatus.Conflict;
             _syncCountdown = AutoSyncIntervalSeconds;
 
@@ -267,7 +267,7 @@ namespace Persistly.Unity.LastBeacon
                 return;
             }
 
-            _status = "PersistlyGameSaves sync status: " + sync.Status + ". Version " + _profile.Version + ".";
+            _status = "PersistlyGameSaves sync status: " + sync.Status + ". Version " + _account.Version + ".";
         }
 
         private void BeginTask(Func<Task> taskFactory, string status)
@@ -295,27 +295,27 @@ namespace Persistly.Unity.LastBeacon
             finally
             {
                 _pendingTask = null;
-                PersistProfile();
+                PersistAccount();
             }
         }
 
         private async Task SaveCurrentSlotLocalAsync()
         {
             await EnsureFacadeAsync();
-            _profile.State = _state.ToSaveState();
-            await PersistlyGameSaves.Shared.SaveSlotAsync(NormalizeSlotKey(_profile.Config.SlotLabel), _profile.State, new PersistlySaveSlotOptions
+            _account.State = _state.ToSaveState();
+            await PersistlyGameSaves.Shared.SaveSlotAsync(NormalizeSlotId(_account.Config.SlotLabel), _account.State, new PersistlySaveSlotOptions
             {
-                MetadataJson = JsonUtility.ToJson(BuildMetadata())
+                SlotInfoJson = JsonUtility.ToJson(BuildSlotInfo())
             });
-            RefreshProfileSessionAndSlotInspection();
+            RefreshAccountSessionAndSlotInspection();
         }
 
-        private LastBeaconMetadata BuildMetadata()
+        private LastBeaconSlotInfo BuildSlotInfo()
         {
-            return new LastBeaconMetadata
+            return new LastBeaconSlotInfo
             {
-                characterName = string.IsNullOrWhiteSpace(_profile.Config.CharacterName) ? "Ayla" : _profile.Config.CharacterName.Trim(),
-                slotLabel = string.IsNullOrWhiteSpace(_profile.Config.SlotLabel) ? "Beacon-A" : _profile.Config.SlotLabel.Trim(),
+                slotName = string.IsNullOrWhiteSpace(_account.Config.SlotName) ? "Ayla" : _account.Config.SlotName.Trim(),
+                slotLabel = string.IsNullOrWhiteSpace(_account.Config.SlotLabel) ? "Beacon-A" : _account.Config.SlotLabel.Trim(),
             };
         }
 
@@ -326,21 +326,21 @@ namespace Persistly.Unity.LastBeacon
                 return;
             }
 
-            if (string.IsNullOrWhiteSpace(_profile.Config.RuntimeKey))
+            if (string.IsNullOrWhiteSpace(_account.Config.RuntimeKey))
             {
                 throw new PersistlyConfigurationError("Persistly Runtime Key must be configured first.");
             }
 
-            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings(_profile.Config.RuntimeKey.Trim())
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings(_account.Config.RuntimeKey.Trim())
             {
-                PlayerRef = NormalizeOptional(_profile.Config.PlayerRef),
-                ProfileSaveId = NormalizeOptional(_profile.ProfileSaveId),
-                ProfileSessionToken = NormalizeOptional(_profile.ProfileSessionToken),
+                PlayerRef = NormalizeOptional(_account.Config.PlayerRef),
+                AccountId = NormalizeOptional(_account.AccountId),
+                AccountSessionToken = NormalizeOptional(_account.AccountSessionToken),
                 Store = new FilePersistlyGameSavesStore(Application.persistentDataPath),
                 OnSyncResult = OnPersistlySyncResult
             });
             _facadeConfigured = true;
-            RefreshProfileSessionAndSlotInspection();
+            RefreshAccountSessionAndSlotInspection();
         }
 
         private void OnPersistlySyncResult(PersistlySyncNotification notification)
@@ -351,21 +351,21 @@ namespace Persistly.Unity.LastBeacon
             }
         }
 
-        private void RefreshProfileSessionAndSlotInspection()
+        private void RefreshAccountSessionAndSlotInspection()
         {
-            var session = PersistlyGameSaves.Shared.GetProfileSession(includeToken: true);
-            _profile.ProfileSaveId = session.ProfileSaveId ?? string.Empty;
-            _profile.ProfileSessionToken = session.ProfileSessionToken ?? string.Empty;
+            var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
+            _account.AccountId = session.AccountId ?? string.Empty;
+            _account.AccountSessionToken = session.AccountSessionToken ?? string.Empty;
 
-            var inspect = PersistlyGameSaves.Shared.InspectSlot(NormalizeSlotKey(_profile.Config.SlotLabel));
-            _profile.CharacterSaveId = inspect.CharacterSaveId ?? _profile.CharacterSaveId;
-            _profile.Version = inspect.Version ?? _profile.Version;
+            var inspect = PersistlyGameSaves.Shared.InspectSlot(NormalizeSlotId(_account.Config.SlotLabel));
+            _account.SlotId = inspect.SlotId ?? _account.SlotId;
+            _account.Version = inspect.Version ?? _account.Version;
         }
 
-        private void PersistProfile()
+        private void PersistAccount()
         {
-            _profile.State = _state.ToSaveState();
-            _store.Save(_profile);
+            _account.State = _state.ToSaveState();
+            _store.Save(_account);
         }
 
         private static string? NormalizeOptional(string value)
@@ -373,9 +373,9 @@ namespace Persistly.Unity.LastBeacon
             return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
         }
 
-        private static string NormalizeSlotKey(string value)
+        private static string NormalizeSlotId(string value)
         {
-            return PersistlySlotKey.Normalize(string.IsNullOrWhiteSpace(value) ? SlotKeyFallback : value.Trim());
+            return PersistlySlotId.Normalize(string.IsNullOrWhiteSpace(value) ? SlotIdFallback : value.Trim());
         }
 
         private static float CalculateUiScale()

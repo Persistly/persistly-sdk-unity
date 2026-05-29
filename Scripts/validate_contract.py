@@ -11,8 +11,8 @@ import sys
 
 ROOT = Path(__file__).resolve().parents[1]
 REPO_ROOT = ROOT.parents[1]
-BUNDLE = ROOT / "contracts" / "persistly-contract-v0.3.0"
-CANONICAL_BUNDLE = REPO_ROOT / "platform" / "packages" / "contracts" / "bundles" / "persistly-contract-v0.3.0"
+BUNDLE = ROOT / "contracts" / "persistly-contract-v0.4.0"
+CANONICAL_BUNDLE = REPO_ROOT / "platform" / "packages" / "contracts" / "bundles" / "persistly-contract-v0.4.0"
 MANIFEST = BUNDLE / "manifest.json"
 
 
@@ -30,7 +30,7 @@ def main() -> int:
         return 1
 
     manifest = json.loads(MANIFEST.read_text(encoding="utf-8"))
-    expected_bundle = "persistly-contract-v0.3.0"
+    expected_bundle = "persistly-contract-v0.4.0"
     if manifest.get("bundle") != expected_bundle:
         print(f"unexpected bundle: {manifest.get('bundle')}", file=sys.stderr)
         return 1

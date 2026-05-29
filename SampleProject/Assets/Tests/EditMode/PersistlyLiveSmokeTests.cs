@@ -17,7 +17,7 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
-        public async Task LiveGameSavesFacadeCreatesLoadsAndSyncsProfileAndSlot()
+        public async Task LiveGameSavesFacadeCreatesLoadsAndSyncsAccountAndSlot()
         {
             var runtimeKey = Environment.GetEnvironmentVariable("PERSISTLY_RUNTIME_KEY");
             if (string.IsNullOrWhiteSpace(runtimeKey))
@@ -36,7 +36,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             {
                 BaseUrl = baseUrl,
                 PlayerRef = smokeId,
-                LocalProfileKey = smokeId,
+                LocalAccountKey = smokeId,
                 SyncPolicy = new PersistlySyncPolicy(
                     minRemoteSyncIntervalSeconds: 1,
                     forceSyncCooldownSeconds: 0,
@@ -63,7 +63,7 @@ namespace Persistly.Unity.LastBeacon.Tests
                 Checkpoint = "unity-live-smoke"
             }, new PersistlySaveSlotOptions
             {
-                MetadataJson = "{\"characterName\":\"Smoke\"}"
+                SlotInfoJson = "{\"slotName\":\"Smoke\"}"
             });
             Assert.That(saved.Status, Is.EqualTo(PersistlySlotStatus.LocalSaved));
 
@@ -75,7 +75,7 @@ namespace Persistly.Unity.LastBeacon.Tests
 
             var firstSync = await PersistlyGameSaves.Shared.ForceSyncDataAsync(new PersistlySyncOptions { BypassCooldown = true });
             Assert.That(firstSync.Status, Is.EqualTo(PersistlySlotStatus.Synced));
-            Assert.That(PersistlyGameSaves.Shared.InspectData().CharacterSaveId, Is.Not.Empty);
+            Assert.That(PersistlyGameSaves.Shared.InspectData().SlotId, Is.Not.Empty);
 
             await PersistlyGameSaves.Shared.SaveDataAsync(new LiveSmokeState
             {
@@ -84,7 +84,7 @@ namespace Persistly.Unity.LastBeacon.Tests
                 Checkpoint = "unity-live-smoke-updated"
             }, new PersistlySaveSlotOptions
             {
-                MetadataJson = "{\"characterName\":\"Smoke\"}"
+                SlotInfoJson = "{\"slotName\":\"Smoke\"}"
             });
 
             var dueResults = await PersistlyGameSaves.Shared.SyncDueSlotsAsync(new PersistlySyncOptions
@@ -93,15 +93,15 @@ namespace Persistly.Unity.LastBeacon.Tests
                 IncludeSkipped = true
             });
             Assert.That(dueResults, Has.Some.Matches<PersistlySlotResult>(result =>
-                result.SlotKey == "autosave" && result.Status == PersistlySlotStatus.Synced));
+                result.SlotId == "autosave" && result.Status == PersistlySlotStatus.Synced));
 
             await PersistlyGameSaves.Shared.PatchAccountDataAsync("{\"diamonds\":8}");
-            var profileSync = await PersistlyGameSaves.Shared.ForceSyncProfileAsync(new PersistlySyncOptions { BypassCooldown = true });
-            Assert.That(profileSync.Status, Is.EqualTo(PersistlyGameSaveStatus.Synced));
+            var accountSync = await PersistlyGameSaves.Shared.ForceSyncAccountAsync(new PersistlySyncOptions { BypassCooldown = true });
+            Assert.That(accountSync.Status, Is.EqualTo(PersistlyGameSaveStatus.Synced));
 
-            var session = PersistlyGameSaves.Shared.GetProfileSession(includeToken: true);
-            Assert.That(session.ProfileSaveId, Is.Not.Empty);
-            Assert.That(session.ProfileSessionToken, Is.Not.Empty);
+            var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
+            Assert.That(session.AccountId, Is.Not.Empty);
+            Assert.That(session.AccountSessionToken, Is.Not.Empty);
         }
 
         [Serializable]

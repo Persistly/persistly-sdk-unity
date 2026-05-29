@@ -94,7 +94,7 @@ namespace Persistly.Unity
                 throw new ArgumentNullException(nameof(request));
             }
 
-            PersistlyJson.ValidatePayloadSizes(request.MetadataJson, request.StateJson);
+            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.StateJson);
 
             var response = await SendJsonAsync(
                 "POST",
@@ -107,219 +107,219 @@ namespace Persistly.Unity
             return save;
         }
 
-        public async Task<PersistlyCreateProfileResponse> CreateProfileAsync(PersistlyCreateProfileRequest request, CancellationToken cancellationToken = default)
+        public async Task<PersistlyCreateAccountResponse> CreateAccountAsync(PersistlyCreateAccountRequest request, CancellationToken cancellationToken = default)
         {
             if (request == null)
             {
                 throw new ArgumentNullException(nameof(request));
             }
 
-            PersistlyJson.ValidatePayloadSizes(request.ProfileMetadataJson, request.AccountDataJson);
-            if (request.Character != null)
+            PersistlyJson.ValidatePayloadSizes(null, request.AccountDataJson);
+            if (request.Slot != null)
             {
-                PersistlyJson.ValidatePayloadSizes(request.Character.MetadataJson, request.Character.StateJson);
+                PersistlyJson.ValidatePayloadSizes(request.Slot.SlotInfoJson, request.Slot.DataJson);
             }
 
             var response = await SendJsonAsync(
                 "POST",
-                "/api/v1/profiles",
-                BuildCreateProfileBody(request),
+                "/api/v1/accounts",
+                BuildCreateAccountBody(request),
                 cancellationToken);
 
-            var created = ParseCreateProfileResponse(response.Body);
-            _cache.Store(created.Profile);
-            if (created.Character != null)
+            var created = ParseCreateAccountResponse(response.Body);
+            _cache.Store(created.Account);
+            if (created.Slot != null)
             {
-                _cache.Store(created.Character);
+                _cache.Store(created.Slot);
             }
 
             return created;
         }
 
-        public async Task<PersistlyProfileEnvelope> LoadProfileAsync(string profileSaveId, string profileSessionToken, CancellationToken cancellationToken = default)
+        public async Task<PersistlyAccountEnvelope> LoadAccountAsync(string accountId, string accountSessionToken, CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(profileSaveId);
-            EnsureSessionToken(profileSessionToken);
+            EnsureSaveId(accountId);
+            EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
                 "GET",
-                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId),
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId),
                 null,
                 cancellationToken,
-                profileSessionToken: profileSessionToken);
+                accountSessionToken: accountSessionToken);
 
-            var profile = ParseProfileEnvelope(response.Body);
-            _cache.Store(profile.Save);
-            return profile;
+            var account = ParseAccountEnvelope(response.Body);
+            _cache.Store(account.Save);
+            return account;
         }
 
-        public async Task<PersistlyDeleteProfileResponse> DeleteProfileAsync(string profileSaveId, string profileSessionToken, CancellationToken cancellationToken = default)
+        public async Task<PersistlyDeleteAccountResponse> DeleteAccountAsync(string accountId, string accountSessionToken, CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(profileSaveId);
-            EnsureSessionToken(profileSessionToken);
+            EnsureSaveId(accountId);
+            EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
                 "DELETE",
-                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId),
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId),
                 null,
                 cancellationToken,
-                profileSessionToken: profileSessionToken);
+                accountSessionToken: accountSessionToken);
 
-            var deleted = ParseDeleteProfileResponse(response.Body);
-            _cache.Clear(profileSaveId);
+            var deleted = ParseDeleteAccountResponse(response.Body);
+            _cache.Clear(accountId);
             return deleted;
         }
 
-        public async Task<PersistlyCreateProfileResponse> CreateProfileCharacterAsync(
-            string profileSaveId,
-            string profileSessionToken,
-            PersistlyCreateProfileCharacterRequest request,
+        public async Task<PersistlyCreateAccountResponse> CreateAccountSlotAsync(
+            string accountId,
+            string accountSessionToken,
+            PersistlyCreateAccountSlotRequest request,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(profileSaveId);
-            EnsureSessionToken(profileSessionToken);
+            EnsureSaveId(accountId);
+            EnsureSessionToken(accountSessionToken);
             if (request == null)
             {
                 throw new ArgumentNullException(nameof(request));
             }
 
-            PersistlyJson.ValidatePayloadSizes(request.CharacterMetadataJson, request.CharacterStateJson);
+            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.SlotDataJson);
 
             var response = await SendJsonAsync(
                 "POST",
-                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters",
-                BuildCreateProfileCharacterBody(request),
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId) + "/slots",
+                BuildCreateAccountSlotBody(request),
                 cancellationToken,
-                profileSessionToken: profileSessionToken);
+                accountSessionToken: accountSessionToken);
 
-            var created = ParseCreateProfileResponse(response.Body);
-            _cache.Store(created.Profile);
-            if (created.Character != null)
+            var created = ParseCreateAccountResponse(response.Body);
+            _cache.Store(created.Account);
+            if (created.Slot != null)
             {
-                _cache.Store(created.Character);
+                _cache.Store(created.Slot);
             }
 
             return created;
         }
 
-        public async Task<PersistlyCreateProfileResponse> ArchiveProfileCharacterAsync(
-            string profileSaveId,
-            string profileSessionToken,
-            string characterSaveId,
+        public async Task<PersistlyCreateAccountResponse> ArchiveSlotAsync(
+            string accountId,
+            string accountSessionToken,
+            string slotId,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(profileSaveId);
-            EnsureSaveId(characterSaveId);
-            EnsureSessionToken(profileSessionToken);
+            EnsureSaveId(accountId);
+            EnsureSaveId(slotId);
+            EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
                 "POST",
-                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters/" + Uri.EscapeDataString(characterSaveId) + "/archive",
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId) + "/slots/" + Uri.EscapeDataString(slotId) + "/archive",
                 null,
                 cancellationToken,
-                profileSessionToken: profileSessionToken);
+                accountSessionToken: accountSessionToken);
 
-            var archived = ParseCreateProfileResponse(response.Body);
-            _cache.Store(archived.Profile);
-            if (archived.Character != null)
+            var archived = ParseCreateAccountResponse(response.Body);
+            _cache.Store(archived.Account);
+            if (archived.Slot != null)
             {
-                _cache.Store(archived.Character);
+                _cache.Store(archived.Slot);
             }
 
             return archived;
         }
 
-        public async Task<PersistlySave> LoadProfileCharacterAsync(string profileSaveId, string profileSessionToken, string characterSaveId, CancellationToken cancellationToken = default)
+        public async Task<PersistlySave> LoadAccountSlotAsync(string accountId, string accountSessionToken, string slotId, CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(profileSaveId);
-            EnsureSaveId(characterSaveId);
-            EnsureSessionToken(profileSessionToken);
+            EnsureSaveId(accountId);
+            EnsureSaveId(slotId);
+            EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
                 "GET",
-                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters/" + Uri.EscapeDataString(characterSaveId),
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId) + "/slots/" + Uri.EscapeDataString(slotId),
                 null,
                 cancellationToken,
-                profileSessionToken: profileSessionToken);
+                accountSessionToken: accountSessionToken);
 
-            var save = ParseSaveEnvelope(response.Body);
+            var save = ParseSlotEnvelope(response.Body).Save;
             _cache.Store(save);
             return save;
         }
 
-        public async Task<PersistlyDeleteProfileCharacterResponse> DeleteProfileCharacterAsync(
-            string profileSaveId,
-            string profileSessionToken,
-            string characterSaveId,
+        public async Task<PersistlyDeleteSlotResponse> DeleteAccountSlotAsync(
+            string accountId,
+            string accountSessionToken,
+            string slotId,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(profileSaveId);
-            EnsureSaveId(characterSaveId);
-            EnsureSessionToken(profileSessionToken);
+            EnsureSaveId(accountId);
+            EnsureSaveId(slotId);
+            EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
                 "DELETE",
-                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters/" + Uri.EscapeDataString(characterSaveId),
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId) + "/slots/" + Uri.EscapeDataString(slotId),
                 null,
                 cancellationToken,
-                profileSessionToken: profileSessionToken);
+                accountSessionToken: accountSessionToken);
 
-            var deleted = ParseDeleteProfileCharacterResponse(response.Body);
-            _cache.Clear(characterSaveId);
-            if (deleted.Profile != null)
+            var deleted = ParseDeleteSlotResponse(response.Body);
+            _cache.Clear(slotId);
+            if (deleted.Account != null)
             {
-                _cache.Store(deleted.Profile);
+                _cache.Store(deleted.Account);
             }
 
             return deleted;
         }
 
-        public async Task<PersistlySyncResponse> SyncProfileCharacterAsync(
-            string profileSaveId,
-            string profileSessionToken,
-            string characterSaveId,
+        public async Task<PersistlySyncResponse> SyncAccountSlotAsync(
+            string accountId,
+            string accountSessionToken,
+            string slotId,
             PersistlySyncSaveRequest request,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(profileSaveId);
-            EnsureSaveId(characterSaveId);
-            EnsureSessionToken(profileSessionToken);
+            EnsureSaveId(accountId);
+            EnsureSaveId(slotId);
+            EnsureSessionToken(accountSessionToken);
 
             if (request == null)
             {
                 throw new ArgumentNullException(nameof(request));
             }
 
-            PersistlyJson.ValidatePayloadSizes(request.MetadataJson, request.StateJson);
+            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.StateJson);
 
             var baseVersion = request.BaseVersion;
             PersistlySave cachedSave;
-            if (!baseVersion.HasValue && _cache.TryGet(characterSaveId, out cachedSave))
+            if (!baseVersion.HasValue && _cache.TryGet(slotId, out cachedSave))
             {
                 baseVersion = cachedSave.Version;
             }
 
             if (!baseVersion.HasValue)
             {
-                throw new PersistlyConfigurationError("SyncProfileCharacterAsync requires baseVersion unless the character save is already cached.");
+                throw new PersistlyConfigurationError("SyncAccountSlotAsync requires baseVersion unless the slot save is already cached.");
             }
 
             var response = await SendJsonAsync(
                 "POST",
-                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/characters/" + Uri.EscapeDataString(characterSaveId) + "/sync",
-                BuildSyncBody(request, baseVersion.Value),
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId) + "/slots/" + Uri.EscapeDataString(slotId) + "/sync",
+                BuildSyncSlotBody(request, baseVersion.Value),
                 cancellationToken,
                 acceptConflictStatus: true,
-                profileSessionToken: profileSessionToken);
+                accountSessionToken: accountSessionToken);
 
             if (response.StatusCode == 200)
             {
                 PersistlySave acceptedCachedSave;
-                _cache.TryGet(characterSaveId, out acceptedCachedSave);
+                _cache.TryGet(slotId, out acceptedCachedSave);
                 var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
                 var accepted = BuildAcceptedSyncResponse(
                     acceptedPayload,
-                    acceptedPayload.Save ?? SynthesizeSave(characterSaveId, acceptedCachedSave, request.MetadataJson, request.StateJson));
+                    acceptedPayload.Save ?? SynthesizeSave(slotId, acceptedCachedSave, request.SlotInfoJson, request.StateJson));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -358,37 +358,37 @@ namespace Persistly.Unity
             return ParseRuntimeConfig(response.Body);
         }
 
-        public async Task<PersistlySyncResponse> SyncProfileAccountDataAsync(
-            string profileSaveId,
-            string profileSessionToken,
-            PersistlySyncProfileAccountDataRequest request,
+        public async Task<PersistlySyncResponse> SyncAccountDataAsync(
+            string accountId,
+            string accountSessionToken,
+            PersistlySyncAccountDataRequest request,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(profileSaveId);
-            EnsureSessionToken(profileSessionToken);
+            EnsureSaveId(accountId);
+            EnsureSessionToken(accountSessionToken);
             if (request == null)
             {
                 throw new ArgumentNullException(nameof(request));
             }
 
-            PersistlyJson.ValidatePayloadSizes(request.MetadataJson, request.AccountDataJson ?? request.AccountDataPatchJson ?? "{}");
+            PersistlyJson.ValidatePayloadSizes(null, request.AccountDataJson ?? request.AccountDataPatchJson ?? "{}");
 
             var response = await SendJsonAsync(
                 "POST",
-                "/api/v1/profiles/" + Uri.EscapeDataString(profileSaveId) + "/account-data/sync",
-                BuildSyncProfileAccountDataBody(request),
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId) + "/data/sync",
+                BuildSyncAccountDataBody(request),
                 cancellationToken,
                 acceptConflictStatus: true,
-                profileSessionToken: profileSessionToken);
+                accountSessionToken: accountSessionToken);
 
             if (response.StatusCode == 200)
             {
                 PersistlySave cachedSave;
-                _cache.TryGet(profileSaveId, out cachedSave);
+                _cache.TryGet(accountId, out cachedSave);
                 var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
                 var accepted = BuildAcceptedSyncResponse(
                     acceptedPayload,
-                    acceptedPayload.Save ?? SynthesizeProfileSave(profileSaveId, cachedSave, request));
+                    acceptedPayload.Save ?? SynthesizeAccountSave(accountId, cachedSave, request));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -427,7 +427,7 @@ namespace Persistly.Unity
                 throw new ArgumentNullException(nameof(request));
             }
 
-            PersistlyJson.ValidatePayloadSizes(request.MetadataJson, request.StateJson);
+            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.StateJson);
 
             var baseVersion = request.BaseVersion;
             PersistlySave cachedSave;
@@ -455,7 +455,7 @@ namespace Persistly.Unity
                 var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
                 var accepted = BuildAcceptedSyncResponse(
                     acceptedPayload,
-                    acceptedPayload.Save ?? SynthesizeSave(saveId, acceptedCachedSave, request.MetadataJson, request.StateJson));
+                    acceptedPayload.Save ?? SynthesizeSave(saveId, acceptedCachedSave, request.SlotInfoJson, request.StateJson));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -476,7 +476,7 @@ namespace Persistly.Unity
             string? body,
             CancellationToken cancellationToken,
             bool acceptConflictStatus = false,
-            string? profileSessionToken = null)
+            string? accountSessionToken = null)
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
@@ -495,9 +495,9 @@ namespace Persistly.Unity
             {
                 headers["X-Persistly-Client-Version"] = _clientVersion!;
             }
-            if (!string.IsNullOrWhiteSpace(profileSessionToken))
+            if (!string.IsNullOrWhiteSpace(accountSessionToken))
             {
-                headers["X-Persistly-Profile-Session"] = profileSessionToken.Trim();
+                headers["X-Persistly-Account-Session"] = accountSessionToken.Trim();
             }
 
             var request = new PersistlyTransportRequest(method, new Uri(_baseUri, relativePath).ToString(), body, _timeoutSeconds, headers);
@@ -536,9 +536,9 @@ namespace Persistly.Unity
                 body += "\"playerRef\":" + PersistlyJson.EscapeJsonString(request.PlayerRef) + ",";
             }
 
-            if (request.MetadataJson != null)
+            if (request.SlotInfoJson != null)
             {
-                body += "\"metadata\":" + request.MetadataJson + ",";
+                body += "\"slotInfo\":" + request.SlotInfoJson + ",";
             }
 
             body += "\"state\":" + request.StateJson;
@@ -550,9 +550,9 @@ namespace Persistly.Unity
         {
             var body = "{";
             body += "\"baseVersion\":" + baseVersion.ToString(CultureInfo.InvariantCulture) + ",";
-            if (request.MetadataJson != null)
+            if (request.SlotInfoJson != null)
             {
-                body += "\"metadata\":" + request.MetadataJson + ",";
+                body += "\"slotInfo\":" + request.SlotInfoJson + ",";
             }
 
             body += "\"state\":" + request.StateJson;
@@ -560,7 +560,21 @@ namespace Persistly.Unity
             return body;
         }
 
-        private static string BuildCreateProfileBody(PersistlyCreateProfileRequest request)
+        private static string BuildSyncSlotBody(PersistlySyncSaveRequest request, int baseVersion)
+        {
+            var body = "{";
+            body += "\"baseVersion\":" + baseVersion.ToString(CultureInfo.InvariantCulture) + ",";
+            if (request.SlotInfoJson != null)
+            {
+                body += "\"slotInfo\":" + request.SlotInfoJson + ",";
+            }
+
+            body += "\"data\":" + request.StateJson;
+            body += "}";
+            return body;
+        }
+
+        private static string BuildCreateAccountBody(PersistlyCreateAccountRequest request)
         {
             var body = "{";
             if (request.PlayerRef != null)
@@ -568,20 +582,15 @@ namespace Persistly.Unity
                 body += "\"playerRef\":" + PersistlyJson.EscapeJsonString(request.PlayerRef) + ",";
             }
 
-            if (request.ExternalProfileRefJson != null)
+            if (request.ExternalAccountRefJson != null)
             {
-                body += "\"externalProfileRef\":" + request.ExternalProfileRefJson + ",";
-            }
-
-            if (request.ProfileMetadataJson != null)
-            {
-                body += "\"profileMetadata\":" + request.ProfileMetadataJson + ",";
+                body += "\"externalAccountRef\":" + request.ExternalAccountRefJson + ",";
             }
 
             body += "\"accountData\":" + request.AccountDataJson + ",";
-            if (request.Character != null)
+            if (request.Slot != null)
             {
-                body += "\"character\":{\"metadata\":" + request.Character.MetadataJson + ",\"state\":" + request.Character.StateJson + "}";
+                body += "\"slot\":{\"slotId\":" + PersistlyJson.EscapeJsonString(request.Slot.SlotId) + ",\"slotInfo\":" + request.Slot.SlotInfoJson + ",\"data\":" + request.Slot.DataJson + "}";
             }
             else
             {
@@ -592,15 +601,16 @@ namespace Persistly.Unity
             return body;
         }
 
-        private static string BuildCreateProfileCharacterBody(PersistlyCreateProfileCharacterRequest request)
+        private static string BuildCreateAccountSlotBody(PersistlyCreateAccountSlotRequest request)
         {
             return "{" +
-                "\"metadata\":" + request.CharacterMetadataJson + "," +
-                "\"state\":" + request.CharacterStateJson +
+                "\"slotId\":" + PersistlyJson.EscapeJsonString(request.SlotId) + "," +
+                "\"slotInfo\":" + request.SlotInfoJson + "," +
+                "\"data\":" + request.SlotDataJson +
                 "}";
         }
 
-        private static string BuildSyncProfileAccountDataBody(PersistlySyncProfileAccountDataRequest request)
+        private static string BuildSyncAccountDataBody(PersistlySyncAccountDataRequest request)
         {
             var body = "{";
             body += "\"baseVersion\":" + request.BaseVersion.ToString(CultureInfo.InvariantCulture);
@@ -614,15 +624,6 @@ namespace Persistly.Unity
                 body += ",\"accountDataPatch\":" + request.AccountDataPatchJson;
             }
 
-            if (request.ClearMetadata)
-            {
-                body += ",\"metadata\":null";
-            }
-            else if (request.MetadataJson != null)
-            {
-                body += ",\"metadata\":" + request.MetadataJson;
-            }
-
             body += "}";
             return body;
         }
@@ -634,93 +635,98 @@ namespace Persistly.Unity
             return ParseSave(save);
         }
 
-        private static PersistlyCreateProfileResponse ParseCreateProfileResponse(string body)
+        private static PersistlyCreateAccountResponse ParseCreateAccountResponse(string body)
         {
-            var root = AsObject(PersistlyJson.ParseJsonValue(body, "create profile response"), "create profile response");
-            var profileSaveId = GetRequiredString(root, "profileSaveId", "profile envelope");
-            var profileSessionToken = GetOptionalString(root, "profileSessionToken");
-            var profileRoot = GetRequiredObject(root, "profile", "profile envelope");
-            PersistlySave? character = null;
-            if (root.ContainsKey("character") && root["character"] != null)
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "create account response"), "create account response");
+            var accountId = GetRequiredString(root, "accountId", "account envelope");
+            var accountSessionToken = GetOptionalString(root, "accountSessionToken");
+            var accountRoot = GetRequiredObject(root, "account", "account envelope");
+            PersistlySave? slot = null;
+            if (root.ContainsKey("slot") && root["slot"] != null)
             {
-                character = ParseSave(GetRequiredObject(root, "character", "profile envelope"));
+                slot = ParseSlotAsSave(GetRequiredObject(root, "slot", "account envelope"));
             }
 
             var policy = root.ContainsKey("syncPolicy")
-                ? ParseSyncPolicy(GetRequiredObject(root, "syncPolicy", "profile envelope"))
+                ? ParseSyncPolicy(GetRequiredObject(root, "syncPolicy", "account envelope"))
                 : new PersistlySyncPolicy(60, 10, true, true, true, 25);
-            return new PersistlyCreateProfileResponse(profileSaveId, profileSessionToken, ParseSave(profileRoot), character, policy);
+            return new PersistlyCreateAccountResponse(accountId, accountSessionToken, ParseAccountAsSave(accountRoot), slot, policy);
         }
 
-        private static PersistlyProfileEnvelope ParseProfileEnvelope(string body)
+        private static PersistlyAccountEnvelope ParseAccountEnvelope(string body)
         {
-            var root = AsObject(PersistlyJson.ParseJsonValue(body, "profile envelope"), "profile envelope");
-            return ParseProfileEnvelope(root);
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "account envelope"), "account envelope");
+            return ParseAccountEnvelope(root);
         }
 
-        private static PersistlyProfileEnvelope ParseProfileEnvelope(Dictionary<string, object?> profileRoot)
+        private static PersistlyAccountEnvelope ParseAccountEnvelope(Dictionary<string, object?> accountRoot)
         {
-            var profileSaveId = GetRequiredString(profileRoot, "profileSaveId", "profile envelope");
-            var profileSessionToken = GetOptionalString(profileRoot, "profileSessionToken");
-            var save = profileRoot.ContainsKey("save")
-                ? GetRequiredObject(profileRoot, "save", "profile envelope")
-                : GetRequiredObject(profileRoot, "profile", "profile envelope");
-            var policy = profileRoot.ContainsKey("syncPolicy")
-                ? ParseSyncPolicy(GetRequiredObject(profileRoot, "syncPolicy", "profile envelope"))
+            var accountId = GetRequiredString(accountRoot, "accountId", "account envelope");
+            var accountSessionToken = GetOptionalString(accountRoot, "accountSessionToken");
+            var save = accountRoot.ContainsKey("save")
+                ? ParseSave(GetRequiredObject(accountRoot, "save", "account envelope"))
+                : ParseAccountAsSave(accountRoot.ContainsKey("account") ? GetRequiredObject(accountRoot, "account", "account envelope") : accountRoot);
+            var policy = accountRoot.ContainsKey("syncPolicy")
+                ? ParseSyncPolicy(GetRequiredObject(accountRoot, "syncPolicy", "account envelope"))
                 : null;
-            return new PersistlyProfileEnvelope(profileSaveId, profileSessionToken, ParseSave(save), policy);
+            return new PersistlyAccountEnvelope(accountId, accountSessionToken, save, policy);
         }
 
-        private static PersistlyDeleteProfileResponse ParseDeleteProfileResponse(string body)
+        private static PersistlyDeleteAccountResponse ParseDeleteAccountResponse(string body)
         {
-            var root = AsObject(PersistlyJson.ParseJsonValue(body, "delete profile response"), "delete profile response");
-            var profileSaveId = GetRequiredString(root, "profileSaveId", "delete profile response");
-            var deletedAt = GetRequiredDateTimeOffset(root, "deletedAt", "delete profile response");
-            var deletedCharacterCount = GetRequiredInt(root, "deletedCharacterCount", "delete profile response");
-            if (deletedCharacterCount < 0)
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "delete account response"), "delete account response");
+            var accountId = GetRequiredString(root, "accountId", "delete account response");
+            var deletedAt = GetRequiredDateTimeOffset(root, "deletedAt", "delete account response");
+            var deletedSlotCount = root.ContainsKey("deletedSlotCount")
+                ? GetRequiredInt(root, "deletedSlotCount", "delete account response")
+                : 0;
+            if (deletedSlotCount < 0)
             {
-                throw new PersistlyConfigurationError("delete profile response deletedCharacterCount must be zero or greater.");
+                throw new PersistlyConfigurationError("delete account response deletedSlotCount must be zero or greater.");
             }
 
-            return new PersistlyDeleteProfileResponse(
-                profileSaveId,
+            return new PersistlyDeleteAccountResponse(
+                accountId,
                 deletedAt,
-                deletedCharacterCount,
-                GetRequiredBool(root, "alreadyDeleted", "delete profile response"),
-                GetRequiredBool(root, "cleanupQueued", "delete profile response"));
+                deletedSlotCount,
+                GetRequiredBool(root, "alreadyDeleted", "delete account response"),
+                GetRequiredBool(root, "cleanupQueued", "delete account response"));
         }
 
-        private static PersistlyDeleteProfileCharacterResponse ParseDeleteProfileCharacterResponse(string body)
+        private static PersistlyDeleteSlotResponse ParseDeleteSlotResponse(string body)
         {
-            var root = AsObject(PersistlyJson.ParseJsonValue(body, "delete profile character response"), "delete profile character response");
-            PersistlySave? profile = null;
-            Dictionary<string, object?>? profileRoot;
-            if (TryGetObject(root, "profile", out profileRoot))
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "delete account slot response"), "delete account slot response");
+            PersistlySave? account = null;
+            Dictionary<string, object?>? accountRoot;
+            if (TryGetObject(root, "account", out accountRoot))
             {
-                profile = ParseSave(profileRoot!);
+                account = ParseAccountAsSave(accountRoot!);
             }
 
-            return new PersistlyDeleteProfileCharacterResponse(
-                GetRequiredString(root, "profileSaveId", "delete profile character response"),
-                GetRequiredString(root, "characterSaveId", "delete profile character response"),
-                GetRequiredDateTimeOffset(root, "deletedAt", "delete profile character response"),
-                GetRequiredBool(root, "alreadyDeleted", "delete profile character response"),
-                GetRequiredBool(root, "cleanupQueued", "delete profile character response"),
-                GetOptionalString(root, "slotKey"),
-                profile);
+            return new PersistlyDeleteSlotResponse(
+                GetRequiredString(root, "accountId", "delete account slot response"),
+                GetRequiredString(root, "slotId", "delete account slot response"),
+                GetRequiredDateTimeOffset(root, "deletedAt", "delete account slot response"),
+                GetRequiredBool(root, "alreadyDeleted", "delete account slot response"),
+                GetRequiredBool(root, "cleanupQueued", "delete account slot response"),
+                account);
         }
 
-        private static PersistlyCharacterEnvelope ParseCharacterEnvelope(string body)
+        private static PersistlySlotEnvelope ParseSlotEnvelope(string body)
         {
-            var root = AsObject(PersistlyJson.ParseJsonValue(body, "character envelope"), "character envelope");
-            var characterRoot = root.ContainsKey("character") ? GetRequiredObject(root, "character", "character envelope") : root;
-            return ParseCharacterEnvelope(characterRoot);
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "slot envelope"), "slot envelope");
+            var slotRoot = root.ContainsKey("slot") ? GetRequiredObject(root, "slot", "slot envelope") : root;
+            return ParseSlotEnvelope(slotRoot);
         }
 
-        private static PersistlyCharacterEnvelope ParseCharacterEnvelope(Dictionary<string, object?> characterRoot)
+        private static PersistlySlotEnvelope ParseSlotEnvelope(Dictionary<string, object?> slotRoot)
         {
-            var save = GetRequiredObject(characterRoot, "save", "character envelope");
-            return new PersistlyCharacterEnvelope(ParseSave(save));
+            if (slotRoot.ContainsKey("save"))
+            {
+                return new PersistlySlotEnvelope(ParseSave(GetRequiredObject(slotRoot, "save", "slot envelope")));
+            }
+
+            return new PersistlySlotEnvelope(ParseSlotAsSave(slotRoot));
         }
 
         private static PersistlyRuntimeConfig ParseRuntimeConfig(string body)
@@ -810,6 +816,14 @@ namespace Persistly.Unity
             {
                 save = ParseSave(saveObject);
             }
+            else if (TryGetObject(root, "slot", out var slotObject) && slotObject != null)
+            {
+                save = ParseSlotAsSave(slotObject);
+            }
+            else if (TryGetObject(root, "account", out var accountObject) && accountObject != null)
+            {
+                save = ParseAccountAsSave(accountObject);
+            }
 
             var version = root.ContainsKey("version") ? GetRequiredInt(root, "version", "sync response") : save?.Version ?? 0;
             if (version < 1)
@@ -836,7 +850,7 @@ namespace Persistly.Unity
                 new PersistlySave(
                     save.SaveId,
                     save.PlayerRef,
-                    save.MetadataJson,
+                    save.SlotInfoJson,
                     save.StateJson,
                     payload.Version,
                     save.CreatedAt,
@@ -845,26 +859,26 @@ namespace Persistly.Unity
                 warnings: payload.Warnings);
         }
 
-        private static PersistlySave SynthesizeSave(string saveId, PersistlySave? cachedSave, string? metadataJson, string stateJson)
+        private static PersistlySave SynthesizeSave(string saveId, PersistlySave? cachedSave, string? slotInfoJson, string stateJson)
         {
             return new PersistlySave(
                 saveId,
                 cachedSave?.PlayerRef,
-                metadataJson ?? cachedSave?.MetadataJson ?? "{}",
+                slotInfoJson ?? cachedSave?.SlotInfoJson ?? "{}",
                 stateJson,
                 1,
                 cachedSave?.CreatedAt ?? DateTimeOffset.FromUnixTimeSeconds(0),
                 DateTimeOffset.FromUnixTimeSeconds(0));
         }
 
-        private static PersistlySave SynthesizeProfileSave(
-            string profileSaveId,
+        private static PersistlySave SynthesizeAccountSave(
+            string accountId,
             PersistlySave? cachedSave,
-            PersistlySyncProfileAccountDataRequest request)
+            PersistlySyncAccountDataRequest request)
         {
             var cachedState = cachedSave == null
                 ? new Dictionary<string, object?>()
-                : AsObject(PersistlyJson.ParseJsonValue(cachedSave.StateJson, "cached profile state"), "cached profile state");
+                : AsObject(PersistlyJson.ParseJsonValue(cachedSave.StateJson, "cached account state"), "cached account state");
             var accountData = request.AccountDataJson != null
                 ? AsObject(PersistlyJson.ParseJsonValue(request.AccountDataJson, "accountData"), "accountData")
                 : MergeObjects(
@@ -874,20 +888,20 @@ namespace Persistly.Unity
                     request.AccountDataPatchJson == null
                         ? new Dictionary<string, object?>()
                         : AsObject(PersistlyJson.ParseJsonValue(request.AccountDataPatchJson, "accountDataPatch"), "accountDataPatch"));
-            var characterSlots = cachedState.ContainsKey("characterSlots") && cachedState["characterSlots"] is List<object?> existingSlots
+            var slots = cachedState.ContainsKey("slots") && cachedState["slots"] is List<object?> existingSlots
                 ? existingSlots
                 : new List<object?>();
             var stateJson = PersistlyJson.Serialize(new Dictionary<string, object?>
             {
-                ["schema"] = "persistly.profile.v1",
+                ["schema"] = "persistly.account.v1",
                 ["accountData"] = accountData,
-                ["characterSlots"] = characterSlots,
+                ["slots"] = slots,
             });
 
             return new PersistlySave(
-                profileSaveId,
+                accountId,
                 cachedSave?.PlayerRef,
-                request.ClearMetadata ? "{}" : request.MetadataJson ?? cachedSave?.MetadataJson ?? "{}",
+                cachedSave?.SlotInfoJson ?? "{}",
                 stateJson,
                 1,
                 cachedSave?.CreatedAt ?? DateTimeOffset.FromUnixTimeSeconds(0),
@@ -948,7 +962,11 @@ namespace Persistly.Unity
                 throw new PersistlyConfigurationError("Conflict sync response had an unexpected status.");
             }
 
-            var save = GetRequiredObject(root, "save", "sync response");
+            var save = root.ContainsKey("slot")
+                ? ParseSlotAsSave(GetRequiredObject(root, "slot", "sync response"))
+                : root.ContainsKey("account")
+                    ? ParseAccountAsSave(GetRequiredObject(root, "account", "sync response"))
+                    : ParseSave(GetRequiredObject(root, "save", "sync response"));
             var details = GetRequiredObject(root, "details", "sync response");
             var reason = GetRequiredString(details, "reason", "sync response details");
             if (!string.Equals(reason, "base_version_mismatch", StringComparison.Ordinal))
@@ -958,7 +976,7 @@ namespace Persistly.Unity
 
             return new PersistlySyncResponse(
                 PersistlySyncStatus.Conflict,
-                ParseSave(save),
+                save,
                 new PersistlySyncConflictDetails(PersistlySyncConflictReason.BaseVersionMismatch));
         }
 
@@ -966,8 +984,12 @@ namespace Persistly.Unity
         {
             var saveId = GetRequiredString(saveObject, "saveId", "save");
             var playerRef = GetOptionalString(saveObject, "playerRef");
-            var metadata = GetRequiredObject(saveObject, "metadata", "save");
-            var state = GetRequiredObject(saveObject, "state", "save");
+            var slotInfo = saveObject.ContainsKey("slotInfo")
+                ? GetRequiredObject(saveObject, "slotInfo", "save")
+                : GetRequiredObject(saveObject, "metadata", "save");
+            var state = saveObject.ContainsKey("data")
+                ? GetRequiredObject(saveObject, "data", "save")
+                : GetRequiredObject(saveObject, "state", "save");
             var version = GetRequiredInt(saveObject, "version", "save");
             var createdAt = GetRequiredDateTimeOffset(saveObject, "createdAt", "save");
             var updatedAt = GetRequiredDateTimeOffset(saveObject, "updatedAt", "save");
@@ -975,11 +997,45 @@ namespace Persistly.Unity
             return new PersistlySave(
                 saveId,
                 playerRef,
-                PersistlyJson.Serialize(metadata),
+                PersistlyJson.Serialize(slotInfo),
                 PersistlyJson.Serialize(state),
                 version,
                 createdAt,
                 updatedAt);
+        }
+
+        private static PersistlySave ParseAccountAsSave(Dictionary<string, object?> accountObject)
+        {
+            var accountId = GetRequiredString(accountObject, "accountId", "account");
+            var accountData = GetRequiredObject(accountObject, "accountData", "account");
+            var slots = accountObject.ContainsKey("slots") && accountObject["slots"] is List<object?> rawSlots
+                ? rawSlots
+                : new List<object?>();
+            var state = new Dictionary<string, object?>
+            {
+                { "schema", PersistlyAccountState.Schema },
+                { "accountData", accountData },
+                { "slots", slots }
+            };
+            var version = accountObject.ContainsKey("version") ? GetRequiredInt(accountObject, "version", "account") : 1;
+            var updatedAt = accountObject.ContainsKey("updatedAt")
+                ? GetRequiredDateTimeOffset(accountObject, "updatedAt", "account")
+                : DateTimeOffset.FromUnixTimeSeconds(0);
+
+            return new PersistlySave(accountId, GetOptionalString(accountObject, "playerRef"), "{}", PersistlyJson.Serialize(state), version, updatedAt, updatedAt);
+        }
+
+        private static PersistlySave ParseSlotAsSave(Dictionary<string, object?> slotObject)
+        {
+            var slotId = GetRequiredString(slotObject, "slotId", "slot");
+            var slotInfo = GetRequiredObject(slotObject, "slotInfo", "slot");
+            var data = GetRequiredObject(slotObject, "data", "slot");
+            var version = slotObject.ContainsKey("version") ? GetRequiredInt(slotObject, "version", "slot") : 1;
+            var updatedAt = slotObject.ContainsKey("updatedAt")
+                ? GetRequiredDateTimeOffset(slotObject, "updatedAt", "slot")
+                : DateTimeOffset.FromUnixTimeSeconds(0);
+
+            return new PersistlySave(slotId, null, PersistlyJson.Serialize(slotInfo), PersistlyJson.Serialize(data), version, updatedAt, updatedAt);
         }
 
         private static PersistlyApiError ParseApiError(int statusCode, string body, string? transportError)
@@ -1005,50 +1061,50 @@ namespace Persistly.Unity
 
                     if (code == PersistlyErrorCode.SlotAlreadyExists)
                     {
-                        string? slotKey = null;
+                        string? slotId = null;
                         Dictionary<string, object?>? details;
                         if (TryGetObject(error, "details", out details) && details != null)
                         {
-                            slotKey = GetOptionalString(details, "slotKey");
+                            slotId = GetOptionalString(details, "slotId");
                         }
 
-                        return new PersistlySlotAlreadyExistsError(statusCode, message, slotKey, detailsJson);
+                        return new PersistlySlotAlreadyExistsError(statusCode, message, slotId, detailsJson);
                     }
 
-                    if (code == PersistlyErrorCode.CharacterArchived)
+                    if (code == PersistlyErrorCode.SlotArchived)
                     {
-                        string? characterSaveId = null;
+                        string? slotId = null;
                         Dictionary<string, object?>? details;
                         if (TryGetObject(error, "details", out details) && details != null)
                         {
-                            characterSaveId = GetOptionalString(details, "characterSaveId");
+                            slotId = GetOptionalString(details, "slotId");
                         }
 
-                        return new PersistlyArchivedCharacterError(statusCode, message, characterSaveId, detailsJson);
+                        return new PersistlySlotArchivedError(statusCode, message, slotId, detailsJson);
                     }
 
-                    if (code == PersistlyErrorCode.ProfileDeleted)
+                    if (code == PersistlyErrorCode.AccountDeleted)
                     {
-                        string? profileSaveId = null;
+                        string? accountId = null;
                         Dictionary<string, object?>? details;
                         if (TryGetObject(error, "details", out details) && details != null)
                         {
-                            profileSaveId = GetOptionalString(details, "profileSaveId");
+                            accountId = GetOptionalString(details, "accountId");
                         }
 
-                        return new PersistlyProfileDeletedError(statusCode, message, profileSaveId, detailsJson);
+                        return new PersistlyAccountDeletedError(statusCode, message, accountId, detailsJson);
                     }
 
-                    if (code == PersistlyErrorCode.CharacterDeleted)
+                    if (code == PersistlyErrorCode.SlotDeleted)
                     {
-                        string? characterSaveId = null;
+                        string? slotId = null;
                         Dictionary<string, object?>? details;
                         if (TryGetObject(error, "details", out details) && details != null)
                         {
-                            characterSaveId = GetOptionalString(details, "characterSaveId");
+                            slotId = GetOptionalString(details, "slotId");
                         }
 
-                        return new PersistlyCharacterDeletedError(statusCode, message, characterSaveId, detailsJson);
+                        return new PersistlySlotDeletedError(statusCode, message, slotId, detailsJson);
                     }
 
                     if (code == PersistlyErrorCode.MonthlyQuotaExceeded)
@@ -1104,12 +1160,12 @@ namespace Persistly.Unity
                     return new PersistlyConflictError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.SlotAlreadyExists:
                     return new PersistlySlotAlreadyExistsError(statusCode, message, null, detailsJson);
-                case PersistlyErrorCode.CharacterArchived:
-                    return new PersistlyArchivedCharacterError(statusCode, message, null, detailsJson);
-                case PersistlyErrorCode.ProfileDeleted:
-                    return new PersistlyProfileDeletedError(statusCode, message, null, detailsJson);
-                case PersistlyErrorCode.CharacterDeleted:
-                    return new PersistlyCharacterDeletedError(statusCode, message, null, detailsJson);
+                case PersistlyErrorCode.SlotArchived:
+                    return new PersistlySlotArchivedError(statusCode, message, null, detailsJson);
+                case PersistlyErrorCode.AccountDeleted:
+                    return new PersistlyAccountDeletedError(statusCode, message, null, detailsJson);
+                case PersistlyErrorCode.SlotDeleted:
+                    return new PersistlySlotDeletedError(statusCode, message, null, detailsJson);
                 case PersistlyErrorCode.RateLimited:
                     return new PersistlyRateLimitedError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.MonthlyQuotaExceeded:
@@ -1138,12 +1194,12 @@ namespace Persistly.Unity
                     return PersistlyErrorCode.Conflict;
                 case "slot_already_exists":
                     return PersistlyErrorCode.SlotAlreadyExists;
-                case "character_archived":
-                    return PersistlyErrorCode.CharacterArchived;
-                case "profile_deleted":
-                    return PersistlyErrorCode.ProfileDeleted;
-                case "character_deleted":
-                    return PersistlyErrorCode.CharacterDeleted;
+                case "slot_archived":
+                    return PersistlyErrorCode.SlotArchived;
+                case "account_deleted":
+                    return PersistlyErrorCode.AccountDeleted;
+                case "slot_deleted":
+                    return PersistlyErrorCode.SlotDeleted;
                 case "rate_limited":
                     return PersistlyErrorCode.RateLimited;
                 case "monthly_quota_exceeded":
@@ -1238,11 +1294,11 @@ namespace Persistly.Unity
             }
         }
 
-        private static void EnsureSessionToken(string profileSessionToken)
+        private static void EnsureSessionToken(string accountSessionToken)
         {
-            if (string.IsNullOrWhiteSpace(profileSessionToken))
+            if (string.IsNullOrWhiteSpace(accountSessionToken))
             {
-                throw new PersistlyConfigurationError("profileSessionToken must be set.");
+                throw new PersistlyConfigurationError("accountSessionToken must be set.");
             }
         }
 

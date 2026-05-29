@@ -45,93 +45,89 @@ namespace Persistly.Unity
 
     public sealed class PersistlyCreateSaveRequest
     {
-        public PersistlyCreateSaveRequest(string stateJson, string? metadataJson = null, string? playerRef = null)
+        public PersistlyCreateSaveRequest(string stateJson, string? slotInfoJson = null, string? playerRef = null)
         {
             StateJson = PersistlyJson.CanonicalizeObjectJson(stateJson, "state");
-            MetadataJson = metadataJson == null ? null : PersistlyJson.CanonicalizeObjectJson(metadataJson, "metadata");
+            SlotInfoJson = slotInfoJson == null ? null : PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
             PlayerRef = string.IsNullOrWhiteSpace(playerRef) ? null : playerRef.Trim();
         }
 
         public string? PlayerRef { get; }
 
-        public string? MetadataJson { get; }
+        public string? SlotInfoJson { get; }
 
         public string StateJson { get; }
     }
 
     public sealed class PersistlySyncSaveRequest
     {
-        public PersistlySyncSaveRequest(string stateJson, int? baseVersion = null, string? metadataJson = null)
+        public PersistlySyncSaveRequest(string stateJson, int? baseVersion = null, string? slotInfoJson = null)
         {
             BaseVersion = baseVersion;
             StateJson = PersistlyJson.CanonicalizeObjectJson(stateJson, "state");
-            MetadataJson = metadataJson == null ? null : PersistlyJson.CanonicalizeObjectJson(metadataJson, "metadata");
+            SlotInfoJson = slotInfoJson == null ? null : PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
         }
 
         public int? BaseVersion { get; }
 
-        public string? MetadataJson { get; }
+        public string? SlotInfoJson { get; }
 
         public string StateJson { get; }
     }
 
-    public sealed class PersistlyCreateProfileRequest
+    public sealed class PersistlyCreateAccountRequest
     {
-        public PersistlyCreateProfileRequest(
+        public PersistlyCreateAccountRequest(
             string? accountDataJson = null,
-            string? profileMetadataJson = null,
             string? playerRef = null,
-            string? externalProfileRefJson = null,
-            PersistlyCreateProfileInitialCharacterRequest? character = null)
+            string? externalAccountRefJson = null,
+            PersistlyCreateAccountInitialSlotRequest? slot = null)
         {
             AccountDataJson = PersistlyJson.CanonicalizeObjectJson(string.IsNullOrWhiteSpace(accountDataJson) ? "{}" : accountDataJson, "accountData");
-            ProfileMetadataJson = profileMetadataJson == null ? null : PersistlyJson.CanonicalizeObjectJson(profileMetadataJson, "profileMetadata");
             PlayerRef = string.IsNullOrWhiteSpace(playerRef) ? null : playerRef.Trim();
-            ExternalProfileRefJson = externalProfileRefJson == null ? null : PersistlyJson.CanonicalizeObjectJson(externalProfileRefJson, "externalProfileRef");
-            Character = character;
+            ExternalAccountRefJson = externalAccountRefJson == null ? null : PersistlyJson.CanonicalizeObjectJson(externalAccountRefJson, "externalAccountRef");
+            Slot = slot;
         }
 
         public string AccountDataJson { get; }
 
-        public string? ProfileMetadataJson { get; }
-
         public string? PlayerRef { get; }
 
-        public string? ExternalProfileRefJson { get; }
+        public string? ExternalAccountRefJson { get; }
 
-        public PersistlyCreateProfileInitialCharacterRequest? Character { get; }
+        public PersistlyCreateAccountInitialSlotRequest? Slot { get; }
     }
 
-    public sealed class PersistlyCreateProfileInitialCharacterRequest
+    public sealed class PersistlyCreateAccountInitialSlotRequest
     {
-        public PersistlyCreateProfileInitialCharacterRequest(string slotKey, string metadataJson, string stateJson)
+        public PersistlyCreateAccountInitialSlotRequest(string slotId, string slotInfoJson, string dataJson)
         {
-            SlotKey = PersistlySlotKey.Normalize(slotKey);
-            MetadataJson = PersistlySlotKey.BuildMetadataJson(SlotKey, metadataJson);
-            StateJson = PersistlyJson.CanonicalizeObjectJson(stateJson, "characterState");
+            SlotId = PersistlySlotId.Normalize(slotId);
+            SlotInfoJson = PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
+            DataJson = PersistlyJson.CanonicalizeObjectJson(dataJson, "data");
         }
 
-        public string SlotKey { get; }
+        public string SlotId { get; }
 
-        public string MetadataJson { get; }
+        public string SlotInfoJson { get; }
 
-        public string StateJson { get; }
+        public string DataJson { get; }
     }
 
-    public sealed class PersistlyCreateProfileCharacterRequest
+    public sealed class PersistlyCreateAccountSlotRequest
     {
-        public PersistlyCreateProfileCharacterRequest(string slotKey, string characterMetadataJson, string characterStateJson)
+        public PersistlyCreateAccountSlotRequest(string slotId, string slotInfoJson, string slotDataJson)
         {
-            SlotKey = PersistlySlotKey.Normalize(slotKey);
-            CharacterMetadataJson = PersistlySlotKey.BuildMetadataJson(SlotKey, characterMetadataJson);
-            CharacterStateJson = PersistlyJson.CanonicalizeObjectJson(characterStateJson, "characterState");
+            SlotId = PersistlySlotId.Normalize(slotId);
+            SlotInfoJson = PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
+            SlotDataJson = PersistlyJson.CanonicalizeObjectJson(slotDataJson, "data");
         }
 
-        public string SlotKey { get; }
+        public string SlotId { get; }
 
-        public string CharacterMetadataJson { get; }
+        public string SlotInfoJson { get; }
 
-        public string CharacterStateJson { get; }
+        public string SlotDataJson { get; }
     }
 
     public sealed class PersistlySave
@@ -139,7 +135,7 @@ namespace Persistly.Unity
         public PersistlySave(
             string saveId,
             string? playerRef,
-            string metadataJson,
+            string slotInfoJson,
             string stateJson,
             int version,
             DateTimeOffset createdAt,
@@ -147,7 +143,7 @@ namespace Persistly.Unity
         {
             SaveId = saveId;
             PlayerRef = playerRef;
-            MetadataJson = metadataJson;
+            SlotInfoJson = slotInfoJson;
             StateJson = stateJson;
             Version = version;
             CreatedAt = createdAt;
@@ -158,7 +154,7 @@ namespace Persistly.Unity
 
         public string? PlayerRef { get; }
 
-        public string MetadataJson { get; }
+        public string SlotInfoJson { get; }
 
         public string StateJson { get; }
 
@@ -179,32 +175,32 @@ namespace Persistly.Unity
         public PersistlySave Save { get; }
     }
 
-    public sealed class PersistlyProfileEnvelope
+    public sealed class PersistlyAccountEnvelope
     {
-        public PersistlyProfileEnvelope(string profileSaveId, string? profileSessionToken, PersistlySave profile, PersistlySyncPolicy? syncPolicy = null)
+        public PersistlyAccountEnvelope(string accountId, string? accountSessionToken, PersistlySave account, PersistlySyncPolicy? syncPolicy = null)
         {
-            ProfileSaveId = profileSaveId;
-            ProfileSessionToken = profileSessionToken;
-            Profile = profile;
+            AccountId = accountId;
+            AccountSessionToken = accountSessionToken;
+            Account = account;
             SyncPolicy = syncPolicy;
         }
 
-        public string ProfileSaveId { get; }
+        public string AccountId { get; }
 
-        public string? ProfileSessionToken { get; }
+        public string? AccountSessionToken { get; }
 
-        public PersistlySave Profile { get; }
+        public PersistlySave Account { get; }
 
-        public PersistlySave Save => Profile;
+        public PersistlySave Save => Account;
 
         public PersistlySyncPolicy? SyncPolicy { get; }
 
-        public PersistlyProfileState ProfileState => PersistlyProfileState.Parse(Profile.StateJson);
+        public PersistlyAccountState AccountState => PersistlyAccountState.Parse(Account.StateJson);
     }
 
-    public sealed class PersistlyCharacterEnvelope
+    public sealed class PersistlySlotEnvelope
     {
-        public PersistlyCharacterEnvelope(PersistlySave save)
+        public PersistlySlotEnvelope(PersistlySave save)
         {
             Save = save;
         }
@@ -212,75 +208,73 @@ namespace Persistly.Unity
         public PersistlySave Save { get; }
     }
 
-    public sealed class PersistlyCreateProfileResponse
+    public sealed class PersistlyCreateAccountResponse
     {
-        public PersistlyCreateProfileResponse(string profileSaveId, string? profileSessionToken, PersistlySave profile, PersistlySave? character, PersistlySyncPolicy syncPolicy)
+        public PersistlyCreateAccountResponse(string accountId, string? accountSessionToken, PersistlySave account, PersistlySave? slot, PersistlySyncPolicy syncPolicy)
         {
-            ProfileSaveId = profileSaveId;
-            ProfileSessionToken = profileSessionToken;
-            Profile = profile;
-            Character = character;
+            AccountId = accountId;
+            AccountSessionToken = accountSessionToken;
+            Account = account;
+            Slot = slot;
             SyncPolicy = syncPolicy;
         }
 
-        public string ProfileSaveId { get; }
+        public string AccountId { get; }
 
-        public string? ProfileSessionToken { get; }
+        public string? AccountSessionToken { get; }
 
-        public PersistlySave Profile { get; }
+        public PersistlySave Account { get; }
 
-        public PersistlySave? Character { get; }
+        public PersistlySave? Slot { get; }
 
         public PersistlySyncPolicy SyncPolicy { get; }
 
-        public PersistlyProfileState ProfileState => PersistlyProfileState.Parse(Profile.StateJson);
+        public PersistlyAccountState AccountState => PersistlyAccountState.Parse(Account.StateJson);
     }
 
-    public sealed class PersistlyDeleteProfileResponse
+    public sealed class PersistlyDeleteAccountResponse
     {
-        public PersistlyDeleteProfileResponse(string profileSaveId, DateTimeOffset deletedAt, int deletedCharacterCount, bool alreadyDeleted, bool cleanupQueued)
+        public PersistlyDeleteAccountResponse(string accountId, DateTimeOffset deletedAt, int deletedSlotCount, bool alreadyDeleted, bool cleanupQueued)
         {
-            ProfileSaveId = profileSaveId;
+            AccountId = accountId;
             DeletedAt = deletedAt;
-            DeletedCharacterCount = deletedCharacterCount;
+            DeletedSlotCount = deletedSlotCount;
             AlreadyDeleted = alreadyDeleted;
             CleanupQueued = cleanupQueued;
         }
 
-        public string ProfileSaveId { get; }
+        public string AccountId { get; }
 
         public DateTimeOffset DeletedAt { get; }
 
-        public int DeletedCharacterCount { get; }
+        public int DeletedSlotCount { get; }
 
         public bool AlreadyDeleted { get; }
 
         public bool CleanupQueued { get; }
     }
 
-    public sealed class PersistlyDeleteProfileCharacterResponse
+    public sealed class PersistlyDeleteSlotResponse
     {
-        public PersistlyDeleteProfileCharacterResponse(
-            string profileSaveId,
-            string characterSaveId,
+        public PersistlyDeleteSlotResponse(
+            string accountId,
+            string slotId,
             DateTimeOffset deletedAt,
             bool alreadyDeleted,
             bool cleanupQueued,
-            string? slotKey = null,
-            PersistlySave? profile = null)
+            PersistlySave? account = null)
         {
-            ProfileSaveId = profileSaveId;
-            CharacterSaveId = characterSaveId;
+            AccountId = accountId;
+            SlotId = slotId;
             DeletedAt = deletedAt;
             AlreadyDeleted = alreadyDeleted;
             CleanupQueued = cleanupQueued;
-            SlotKey = slotKey;
-            Profile = profile;
+            Account = account;
         }
 
-        public string ProfileSaveId { get; }
+        public string AccountId { get; }
 
-        public string CharacterSaveId { get; }
+        public string SlotId { get; }
 
         public DateTimeOffset DeletedAt { get; }
 
@@ -288,9 +282,7 @@ namespace Persistly.Unity
 
         public bool CleanupQueued { get; }
 
-        public string? SlotKey { get; }
-
-        public PersistlySave? Profile { get; }
+        public PersistlySave? Account { get; }
     }
 
     public sealed class PersistlySyncPolicy
@@ -420,14 +412,12 @@ namespace Persistly.Unity
         public IReadOnlyList<string> Warnings { get; }
     }
 
-    public sealed class PersistlySyncProfileAccountDataRequest
+    public sealed class PersistlySyncAccountDataRequest
     {
-        public PersistlySyncProfileAccountDataRequest(
+        public PersistlySyncAccountDataRequest(
             int baseVersion,
             string? accountDataJson = null,
-            string? accountDataPatchJson = null,
-            string? metadataJson = null,
-            bool clearMetadata = false)
+            string? accountDataPatchJson = null)
         {
             if (baseVersion < 1)
             {
@@ -442,12 +432,10 @@ namespace Persistly.Unity
             BaseVersion = baseVersion;
             AccountDataJson = accountDataJson == null ? null : PersistlyJson.CanonicalizeObjectJson(accountDataJson, "accountData");
             AccountDataPatchJson = accountDataPatchJson == null ? null : PersistlyJson.CanonicalizeObjectJson(accountDataPatchJson, "accountDataPatch");
-            MetadataJson = metadataJson == null ? null : PersistlyJson.CanonicalizeObjectJson(metadataJson, "metadata");
-            ClearMetadata = clearMetadata;
 
-            if (AccountDataJson == null && AccountDataPatchJson == null && MetadataJson == null && !ClearMetadata)
+            if (AccountDataJson == null && AccountDataPatchJson == null)
             {
-                throw new PersistlyConfigurationError("At least one of accountDataJson, accountDataPatchJson, metadataJson, or clearMetadata must be set.");
+                throw new PersistlyConfigurationError("At least one of accountDataJson or accountDataPatchJson must be set.");
             }
         }
 
@@ -456,151 +444,134 @@ namespace Persistly.Unity
         public string? AccountDataJson { get; }
 
         public string? AccountDataPatchJson { get; }
-
-        public string? MetadataJson { get; }
-
-        public bool ClearMetadata { get; }
     }
 
-    public sealed class PersistlyProfileState
+    public sealed class PersistlyAccountState
     {
-        public const string Schema = "persistly.profile.v1";
+        public const string Schema = "persistly.account.v1";
 
-        private PersistlyProfileState(string accountDataJson, IReadOnlyList<PersistlyCharacterSlotRef> characterSlots)
+        private PersistlyAccountState(string accountDataJson, IReadOnlyList<PersistlySlotRef> slots)
         {
             AccountDataJson = accountDataJson;
-            CharacterSlots = characterSlots;
+            Slots = slots;
         }
 
         public string AccountDataJson { get; }
 
-        public IReadOnlyList<PersistlyCharacterSlotRef> CharacterSlots { get; }
+        public IReadOnlyList<PersistlySlotRef> Slots { get; }
 
-        public static PersistlyProfileState Parse(string stateJson)
+        public static PersistlyAccountState Parse(string stateJson)
         {
-            var root = PersistlyJson.ParseJsonValue(stateJson, "profile state") as Dictionary<string, object?>;
+            var root = PersistlyJson.ParseJsonValue(stateJson, "account state") as Dictionary<string, object?>;
             if (root == null)
             {
-                throw new PersistlyConfigurationError("profile state must be a JSON object.");
+                throw new PersistlyConfigurationError("account state must be a JSON object.");
             }
 
             if (!root.TryGetValue("schema", out var schemaRaw) || !(schemaRaw is string schema) || !string.Equals(schema, Schema, StringComparison.Ordinal))
             {
-                throw new PersistlyConfigurationError("profile state schema must be " + Schema + ".");
+                throw new PersistlyConfigurationError("account state schema must be " + Schema + ".");
             }
 
             if (!root.TryGetValue("accountData", out var accountData) || !(accountData is Dictionary<string, object?>))
             {
-                throw new PersistlyConfigurationError("profile state accountData must be a JSON object.");
+                throw new PersistlyConfigurationError("account state accountData must be a JSON object.");
             }
 
-            if (!root.TryGetValue("characterSlots", out var slotsRaw) || !(slotsRaw is List<object?> rawSlots))
+            if (!root.TryGetValue("slots", out var slotsRaw) || !(slotsRaw is List<object?> rawSlots))
             {
-                throw new PersistlyConfigurationError("profile state characterSlots must be an array.");
+                throw new PersistlyConfigurationError("account.slots must be an array.");
             }
 
-            var slots = new List<PersistlyCharacterSlotRef>();
+            var slots = new List<PersistlySlotRef>();
             foreach (var rawSlot in rawSlots)
             {
                 var slotObject = rawSlot as Dictionary<string, object?>;
                 if (slotObject == null)
                 {
-                    throw new PersistlyConfigurationError("profile state characterSlots entries must be objects.");
+                    throw new PersistlyConfigurationError("account.slots entries must be objects.");
                 }
 
-                slots.Add(PersistlyCharacterSlotRef.Parse(slotObject));
+                slots.Add(PersistlySlotRef.Parse(slotObject));
             }
 
-            return new PersistlyProfileState(PersistlyJson.Serialize(accountData), slots);
+            return new PersistlyAccountState(PersistlyJson.Serialize(accountData), slots);
         }
     }
 
-    public sealed class PersistlyCharacterSlotRef
+    public sealed class PersistlySlotRef
     {
-        private PersistlyCharacterSlotRef(string slotKey, string characterSaveId, string metadataJson, bool archived, string? archivedAt)
+        private PersistlySlotRef(string slotId, string slotInfoJson, bool archived, string? archivedAt)
         {
-            SlotKey = slotKey;
-            CharacterSaveId = characterSaveId;
-            MetadataJson = metadataJson;
+            SlotId = slotId;
+            SlotInfoJson = slotInfoJson;
             Archived = archived;
             ArchivedAt = archivedAt;
         }
 
-        public string SlotKey { get; }
+        public string SlotId { get; }
 
-        public string CharacterSaveId { get; }
-
-        public string MetadataJson { get; }
+        public string SlotInfoJson { get; }
 
         public bool Archived { get; }
 
         public string? ArchivedAt { get; }
 
-        public static PersistlyCharacterSlotRef Parse(Dictionary<string, object?> slotObject)
+        public static PersistlySlotRef Parse(Dictionary<string, object?> slotObject)
         {
-            var slotKey = RequireString(slotObject, "slotKey");
-            var characterSaveId = RequireString(slotObject, "characterSaveId");
-            if (!slotObject.TryGetValue("metadata", out var metadata) || !(metadata is Dictionary<string, object?>))
+            var slotId = RequireString(slotObject, "slotId");
+            if (!slotObject.TryGetValue("slotInfo", out var slotInfo) || !(slotInfo is Dictionary<string, object?>))
             {
-                throw new PersistlyConfigurationError("character slot metadata must be a JSON object.");
+                throw new PersistlyConfigurationError("slotInfo must be a JSON object.");
             }
 
             var archived = slotObject.TryGetValue("archived", out var archivedRaw) && archivedRaw is bool archivedBool && archivedBool;
             var archivedAt = slotObject.TryGetValue("archivedAt", out var archivedAtRaw) ? archivedAtRaw as string : null;
-            return new PersistlyCharacterSlotRef(slotKey, characterSaveId, PersistlyJson.Serialize(metadata), archived, archivedAt);
+            return new PersistlySlotRef(slotId, PersistlyJson.Serialize(slotInfo), archived, archivedAt);
         }
 
         private static string RequireString(Dictionary<string, object?> source, string key)
         {
             if (!source.TryGetValue(key, out var raw) || !(raw is string value) || string.IsNullOrWhiteSpace(value))
             {
-                throw new PersistlyConfigurationError("character slot is missing " + key + ".");
+                throw new PersistlyConfigurationError("slot is missing " + key + ".");
             }
 
             return value;
         }
     }
 
-    public static class PersistlySlotKey
+    public static class PersistlySlotId
     {
-        private static readonly Regex SlotKeyPattern = new Regex("^[A-Za-z0-9_.-]{1,64}$", RegexOptions.Compiled);
+        private static readonly Regex SlotIdPattern = new Regex("^[A-Za-z0-9_.-]{1,64}$", RegexOptions.Compiled);
 
-        public static string Normalize(string slotKey)
+        public static string Normalize(string slotId)
         {
-            if (string.IsNullOrWhiteSpace(slotKey))
+            if (string.IsNullOrWhiteSpace(slotId))
             {
-                throw new PersistlyConfigurationError("slotKey must be set.");
+                throw new PersistlyConfigurationError("slotId must be set.");
             }
 
-            var normalized = slotKey.Trim();
-            if (!SlotKeyPattern.IsMatch(normalized))
+            var normalized = slotId.Trim();
+            if (!SlotIdPattern.IsMatch(normalized))
             {
-                throw new PersistlyConfigurationError("slotKey must match ^[A-Za-z0-9_.-]{1,64}$.");
+                throw new PersistlyConfigurationError("slotId must match ^[A-Za-z0-9_.-]{1,64}$.");
             }
 
             return normalized;
         }
 
-        public static string BuildMetadataJson(string slotKey, string? developerMetadataJson)
+        public static string BuildSlotInfoJson(string slotId, string? developerSlotInfoJson)
         {
-            var metadata = string.IsNullOrWhiteSpace(developerMetadataJson)
+            var slotInfo = string.IsNullOrWhiteSpace(developerSlotInfoJson)
                 ? new Dictionary<string, object?>(StringComparer.Ordinal)
-                : PersistlyJson.ParseJsonValue(developerMetadataJson!, "metadata") as Dictionary<string, object?>;
-            if (metadata == null)
+                : PersistlyJson.ParseJsonValue(developerSlotInfoJson!, "slotInfo") as Dictionary<string, object?>;
+            if (slotInfo == null)
             {
-                throw new PersistlyConfigurationError("metadata must be a JSON object.");
+                throw new PersistlyConfigurationError("slotInfo must be a JSON object.");
             }
 
-            if (metadata.ContainsKey("_persistly"))
-            {
-                throw new PersistlyConfigurationError("metadata._persistly is reserved for Persistly slot metadata.");
-            }
-
-            metadata["_persistly"] = new Dictionary<string, object?>
-            {
-                { "slotKey", Normalize(slotKey) }
-            };
-            return PersistlyJson.Serialize(metadata);
+            return PersistlyJson.Serialize(slotInfo);
         }
     }
 }

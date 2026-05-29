@@ -55,30 +55,30 @@ namespace Persistly.Unity
     public sealed class PersistlyAutosaveDraft
     {
         public PersistlyAutosaveDraft(
-            string profileSaveId,
-            string profileSessionToken,
-            string characterSaveId,
-            string metadataJson,
+            string accountId,
+            string accountSessionToken,
+            string slotId,
+            string slotInfoJson,
             string stateJson,
             int? baseVersion,
             DateTimeOffset updatedAt)
         {
-            ProfileSaveId = profileSaveId;
-            ProfileSessionToken = profileSessionToken;
-            CharacterSaveId = characterSaveId;
-            MetadataJson = metadataJson;
+            AccountId = accountId;
+            AccountSessionToken = accountSessionToken;
+            SlotId = slotId;
+            SlotInfoJson = slotInfoJson;
             StateJson = stateJson;
             BaseVersion = baseVersion;
             UpdatedAt = updatedAt;
         }
 
-        public string ProfileSaveId { get; }
+        public string AccountId { get; }
 
-        public string ProfileSessionToken { get; }
+        public string AccountSessionToken { get; }
 
-        public string CharacterSaveId { get; }
+        public string SlotId { get; }
 
-        public string MetadataJson { get; }
+        public string SlotInfoJson { get; }
 
         public string StateJson { get; }
 
@@ -89,11 +89,11 @@ namespace Persistly.Unity
 
     public interface IPersistlyAutosaveDraftStore
     {
-        bool TryLoad(string characterSaveId, out PersistlyAutosaveDraft draft);
+        bool TryLoad(string slotId, out PersistlyAutosaveDraft draft);
 
         void Store(PersistlyAutosaveDraft draft);
 
-        void Clear(string characterSaveId);
+        void Clear(string slotId);
     }
 
     public sealed class InMemoryPersistlyAutosaveDraftStore : IPersistlyAutosaveDraftStore
@@ -101,11 +101,11 @@ namespace Persistly.Unity
         private readonly Dictionary<string, PersistlyAutosaveDraft> _drafts = new Dictionary<string, PersistlyAutosaveDraft>(StringComparer.Ordinal);
         private readonly object _gate = new object();
 
-        public bool TryLoad(string characterSaveId, out PersistlyAutosaveDraft draft)
+        public bool TryLoad(string slotId, out PersistlyAutosaveDraft draft)
         {
             lock (_gate)
             {
-                return _drafts.TryGetValue(characterSaveId, out draft);
+                return _drafts.TryGetValue(slotId, out draft);
             }
         }
 
@@ -118,15 +118,15 @@ namespace Persistly.Unity
 
             lock (_gate)
             {
-                _drafts[draft.CharacterSaveId] = draft;
+                _drafts[draft.SlotId] = draft;
             }
         }
 
-        public void Clear(string characterSaveId)
+        public void Clear(string slotId)
         {
             lock (_gate)
             {
-                _drafts.Remove(characterSaveId);
+                _drafts.Remove(slotId);
             }
         }
     }
@@ -146,9 +146,9 @@ namespace Persistly.Unity
             Directory.CreateDirectory(_rootDirectory);
         }
 
-        public bool TryLoad(string characterSaveId, out PersistlyAutosaveDraft draft)
+        public bool TryLoad(string slotId, out PersistlyAutosaveDraft draft)
         {
-            var path = DraftPath(characterSaveId);
+            var path = DraftPath(slotId);
             if (!File.Exists(path))
             {
                 draft = default!;
@@ -165,10 +165,10 @@ namespace Persistly.Unity
                 }
 
                 draft = new PersistlyAutosaveDraft(
-                    RequireString(parsed, "profileSaveId"),
-                    RequireString(parsed, "profileSessionToken"),
-                    RequireString(parsed, "characterSaveId"),
-                    PersistlyJson.Serialize(RequireObject(parsed, "metadata")),
+                    RequireString(parsed, "accountId"),
+                    RequireString(parsed, "accountSessionToken"),
+                    RequireString(parsed, "slotId"),
+                    PersistlyJson.Serialize(RequireObject(parsed, "slotInfo")),
                     PersistlyJson.Serialize(RequireObject(parsed, "state")),
                     OptionalInt(parsed, "baseVersion"),
                     DateTimeOffset.Parse(RequireString(parsed, "updatedAt"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind));
@@ -191,39 +191,39 @@ namespace Persistly.Unity
             Directory.CreateDirectory(_rootDirectory);
             var payload = new Dictionary<string, object?>
             {
-                { "profileSaveId", draft.ProfileSaveId },
-                { "profileSessionToken", draft.ProfileSessionToken },
-                { "characterSaveId", draft.CharacterSaveId },
-                { "metadata", PersistlyJson.ParseJsonValue(draft.MetadataJson, "metadata") },
+                { "accountId", draft.AccountId },
+                { "accountSessionToken", draft.AccountSessionToken },
+                { "slotId", draft.SlotId },
+                { "slotInfo", PersistlyJson.ParseJsonValue(draft.SlotInfoJson, "slotInfo") },
                 { "state", PersistlyJson.ParseJsonValue(draft.StateJson, "state") },
                 { "baseVersion", draft.BaseVersion },
                 { "updatedAt", draft.UpdatedAt.ToString("O", CultureInfo.InvariantCulture) }
             };
-            File.WriteAllText(DraftPath(draft.CharacterSaveId), PersistlyJson.Serialize(payload));
+            File.WriteAllText(DraftPath(draft.SlotId), PersistlyJson.Serialize(payload));
         }
 
-        public void Clear(string characterSaveId)
+        public void Clear(string slotId)
         {
-            var path = DraftPath(characterSaveId);
+            var path = DraftPath(slotId);
             if (File.Exists(path))
             {
                 File.Delete(path);
             }
         }
 
-        private string DraftPath(string characterSaveId)
+        private string DraftPath(string slotId)
         {
-            if (string.IsNullOrWhiteSpace(characterSaveId))
+            if (string.IsNullOrWhiteSpace(slotId))
             {
-                throw new PersistlyConfigurationError("characterSaveId must be set.");
+                throw new PersistlyConfigurationError("slotId must be set.");
             }
 
             foreach (var invalid in Path.GetInvalidFileNameChars())
             {
-                characterSaveId = characterSaveId.Replace(invalid, '_');
+                slotId = slotId.Replace(invalid, '_');
             }
 
-            return Path.Combine(_rootDirectory, characterSaveId + ".json");
+            return Path.Combine(_rootDirectory, slotId + ".json");
         }
 
         private static string RequireString(Dictionary<string, object?> source, string key)
@@ -303,7 +303,7 @@ namespace Persistly.Unity
         private readonly IPersistlyAutosaveDraftStore _store;
         private readonly PersistlySyncPolicy _syncPolicy;
         private readonly PersistlyAutosaveSyncDelegate _syncRemote;
-        private readonly Dictionary<string, DateTimeOffset> _lastRemoteSyncByCharacter = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
+        private readonly Dictionary<string, DateTimeOffset> _lastRemoteSyncBySlot = new Dictionary<string, DateTimeOffset>(StringComparer.Ordinal);
 
         public PersistlyAutosaveManager(IPersistlyAutosaveDraftStore store, PersistlySyncPolicy syncPolicy, PersistlyAutosaveSyncDelegate syncRemote)
         {
@@ -313,57 +313,57 @@ namespace Persistly.Unity
         }
 
         public Task RecordLocalChangeAsync(
-            string profileSaveId,
-            string profileSessionToken,
-            string characterSaveId,
-            string metadataJson,
+            string accountId,
+            string accountSessionToken,
+            string slotId,
+            string slotInfoJson,
             string stateJson,
             int? baseVersion = null,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(profileSaveId))
+            if (string.IsNullOrWhiteSpace(accountId))
             {
-                throw new PersistlyConfigurationError("profileSaveId must be set.");
+                throw new PersistlyConfigurationError("accountId must be set.");
             }
 
-            if (string.IsNullOrWhiteSpace(profileSessionToken))
+            if (string.IsNullOrWhiteSpace(accountSessionToken))
             {
-                throw new PersistlyConfigurationError("profileSessionToken must be set.");
+                throw new PersistlyConfigurationError("accountSessionToken must be set.");
             }
 
-            if (string.IsNullOrWhiteSpace(characterSaveId))
+            if (string.IsNullOrWhiteSpace(slotId))
             {
-                throw new PersistlyConfigurationError("characterSaveId must be set.");
+                throw new PersistlyConfigurationError("slotId must be set.");
             }
 
-            var canonicalMetadata = PersistlyJson.CanonicalizeObjectJson(metadataJson, "metadata");
+            var canonicalSlotInfo = PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
             var canonicalState = PersistlyJson.CanonicalizeObjectJson(stateJson, "state");
-            PersistlyJson.ValidatePayloadSizes(canonicalMetadata, canonicalState);
+            PersistlyJson.ValidatePayloadSizes(canonicalSlotInfo, canonicalState);
             _store.Store(new PersistlyAutosaveDraft(
-                profileSaveId,
-                profileSessionToken,
-                characterSaveId,
-                canonicalMetadata,
+                accountId,
+                accountSessionToken,
+                slotId,
+                canonicalSlotInfo,
                 canonicalState,
                 baseVersion,
                 DateTimeOffset.UtcNow));
             return Task.CompletedTask;
         }
 
-        public Task<PersistlyAutosaveSyncResult> SyncIfDueAsync(string characterSaveId, CancellationToken cancellationToken = default)
+        public Task<PersistlyAutosaveSyncResult> SyncIfDueAsync(string slotId, CancellationToken cancellationToken = default)
         {
-            return SyncInternalAsync(characterSaveId, false, cancellationToken);
+            return SyncInternalAsync(slotId, false, cancellationToken);
         }
 
-        public Task<PersistlyAutosaveSyncResult> ForceSyncAsync(string characterSaveId, CancellationToken cancellationToken = default)
+        public Task<PersistlyAutosaveSyncResult> ForceSyncAsync(string slotId, CancellationToken cancellationToken = default)
         {
-            return SyncInternalAsync(characterSaveId, true, cancellationToken);
+            return SyncInternalAsync(slotId, true, cancellationToken);
         }
 
-        private async Task<PersistlyAutosaveSyncResult> SyncInternalAsync(string characterSaveId, bool force, CancellationToken cancellationToken)
+        private async Task<PersistlyAutosaveSyncResult> SyncInternalAsync(string slotId, bool force, CancellationToken cancellationToken)
         {
             var now = DateTimeOffset.UtcNow;
-            if (_lastRemoteSyncByCharacter.TryGetValue(characterSaveId, out var lastSync))
+            if (_lastRemoteSyncBySlot.TryGetValue(slotId, out var lastSync))
             {
                 var elapsedSeconds = (now - lastSync).TotalSeconds;
                 if (force && elapsedSeconds < _syncPolicy.ForceSyncCooldownSeconds)
@@ -377,7 +377,7 @@ namespace Persistly.Unity
                 }
             }
 
-            if (!_store.TryLoad(characterSaveId, out var draft))
+            if (!_store.TryLoad(slotId, out var draft))
             {
                 return new PersistlyAutosaveSyncResult(false, null, PersistlyAutosaveSkippedReason.NoDraft);
             }
@@ -385,8 +385,8 @@ namespace Persistly.Unity
             var result = await _syncRemote(draft, force, cancellationToken);
             if (result.SyncedRemotely)
             {
-                _lastRemoteSyncByCharacter[characterSaveId] = now;
-                _store.Clear(characterSaveId);
+                _lastRemoteSyncBySlot[slotId] = now;
+                _store.Clear(slotId);
             }
 
             return result;

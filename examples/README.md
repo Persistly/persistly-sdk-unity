@@ -13,5 +13,5 @@ It saves locally first, loads from local storage, then calls `ForceSyncAsync` ex
 
 Runtime delete helpers also exist on same facade:
 
-- `DeleteSlotAsync("autosave")` for one character slot
-- `DeleteProfileAsync()` for whole stored profile namespace
+- `DeleteSlotAsync("autosave")` for one slot
+- `DeleteAccountAsync()` for whole stored account namespace

@@ -11,9 +11,9 @@ namespace Persistly.Unity
         NotFound,
         Conflict,
         SlotAlreadyExists,
-        CharacterArchived,
-        ProfileDeleted,
-        CharacterDeleted,
+        SlotArchived,
+        AccountDeleted,
+        SlotDeleted,
         RateLimited,
         MonthlyQuotaExceeded,
         PayloadTooLarge,
@@ -103,46 +103,46 @@ namespace Persistly.Unity
 
     public sealed class PersistlySlotAlreadyExistsError : PersistlyApiError
     {
-        public PersistlySlotAlreadyExistsError(int statusCode, string message, string? slotKey, string? detailsJson = null)
+        public PersistlySlotAlreadyExistsError(int statusCode, string message, string? slotId, string? detailsJson = null)
             : base(statusCode, PersistlyErrorCode.SlotAlreadyExists, message, detailsJson)
         {
-            SlotKey = slotKey;
+            SlotId = slotId;
         }
 
-        public string? SlotKey { get; }
+        public string? SlotId { get; }
     }
 
-    public sealed class PersistlyArchivedCharacterError : PersistlyApiError
+    public sealed class PersistlySlotArchivedError : PersistlyApiError
     {
-        public PersistlyArchivedCharacterError(int statusCode, string message, string? characterSaveId, string? detailsJson = null)
-            : base(statusCode, PersistlyErrorCode.CharacterArchived, message, detailsJson)
+        public PersistlySlotArchivedError(int statusCode, string message, string? slotId, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.SlotArchived, message, detailsJson)
         {
-            CharacterSaveId = characterSaveId;
+            SlotId = slotId;
         }
 
-        public string? CharacterSaveId { get; }
+        public string? SlotId { get; }
     }
 
-    public sealed class PersistlyProfileDeletedError : PersistlyApiError
+    public sealed class PersistlyAccountDeletedError : PersistlyApiError
     {
-        public PersistlyProfileDeletedError(int statusCode, string message, string? profileSaveId, string? detailsJson = null)
-            : base(statusCode, PersistlyErrorCode.ProfileDeleted, message, detailsJson)
+        public PersistlyAccountDeletedError(int statusCode, string message, string? accountId, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.AccountDeleted, message, detailsJson)
         {
-            ProfileSaveId = profileSaveId;
+            AccountId = accountId;
         }
 
-        public string? ProfileSaveId { get; }
+        public string? AccountId { get; }
     }
 
-    public sealed class PersistlyCharacterDeletedError : PersistlyApiError
+    public sealed class PersistlySlotDeletedError : PersistlyApiError
     {
-        public PersistlyCharacterDeletedError(int statusCode, string message, string? characterSaveId, string? detailsJson = null)
-            : base(statusCode, PersistlyErrorCode.CharacterDeleted, message, detailsJson)
+        public PersistlySlotDeletedError(int statusCode, string message, string? slotId, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.SlotDeleted, message, detailsJson)
         {
-            CharacterSaveId = characterSaveId;
+            SlotId = slotId;
         }
 
-        public string? CharacterSaveId { get; }
+        public string? SlotId { get; }
     }
 
     public sealed class PersistlyRateLimitedError : PersistlyApiError

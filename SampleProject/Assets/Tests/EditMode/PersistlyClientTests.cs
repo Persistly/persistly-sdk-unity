@@ -9,102 +9,101 @@ namespace Persistly.Unity.LastBeacon.Tests
     public sealed class PersistlyClientTests
     {
         [Test]
-        public async Task CreateProfileSupportsProfileOnlyCreationAndParsesCharacterSlots()
+        public async Task CreateAccountSupportsAccountOnlyCreationAndParsesSlotSlots()
         {
             var transport = new RecordingTransport(
                 201,
-                "{\"profileSaveId\":\"sv_profile\",\"profileSessionToken\":\"pst_profile_session\",\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{\"displayName\":\"Ayla\"},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{\"diamonds\":20},\"characterSlots\":[]},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
+                "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_account_session\",\"account\":{\"accountId\":\"acc_account\",\"accountData\":{\"diamonds\":20},\"slots\":[],\"version\":1,\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
             var client = BuildClient(transport);
 
-            var result = await client.CreateProfileAsync(new PersistlyCreateProfileRequest(
-                "{\"accountData\":{\"diamonds\":20}}",
-                profileMetadataJson: "{\"displayName\":\"Ayla\"}",
+            var result = await client.CreateAccountAsync(new PersistlyCreateAccountRequest(
+                "{\"diamonds\":20}",
                 playerRef: "player-184",
-                externalProfileRefJson: "{\"provider\":\"auth0\",\"subject\":\"auth0|123\"}"));
+                externalAccountRefJson: "{\"provider\":\"auth0\",\"subject\":\"auth0|123\"}"));
 
-            Assert.That(result.ProfileSaveId, Is.EqualTo("sv_profile"));
-            Assert.That(result.ProfileSessionToken, Is.EqualTo("pst_profile_session"));
-            Assert.That(result.Profile.StateJson, Does.Contain("\"characterSlots\":[]"));
-            Assert.That(result.Character, Is.Null);
+            Assert.That(result.AccountId, Is.EqualTo("acc_account"));
+            Assert.That(result.AccountSessionToken, Is.EqualTo("pst_account_session"));
+            Assert.That(result.Account.StateJson, Does.Contain("\"slots\":[]"));
+            Assert.That(result.Slot, Is.Null);
             Assert.That(result.SyncPolicy.MinRemoteSyncIntervalSeconds, Is.EqualTo(60));
-            Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"character\""));
-            Assert.That(transport.LastRequest.Body, Does.Contain("\"externalProfileRef\""));
-            Assert.That(client.TryGetLocal("sv_profile", out var cachedProfile), Is.True);
-            Assert.That(cachedProfile.StateJson, Does.Contain("\"diamonds\":20"));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"slot\""));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"externalAccountRef\""));
+            Assert.That(client.TryGetLocal("acc_account", out var cachedAccount), Is.True);
+            Assert.That(cachedAccount.StateJson, Does.Contain("\"diamonds\":20"));
         }
 
         [Test]
-        public async Task CreateProfileWithInitialCharacterNestsSlotMetadata()
+        public async Task CreateAccountWithInitialSlotNestsSlotSlotInfo()
         {
             var transport = new RecordingTransport(
                 201,
-                "{\"profileSaveId\":\"sv_profile\",\"profileSessionToken\":\"pst_profile_session\",\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[{\"slotKey\":\"autosave\",\"characterSaveId\":\"sv_char\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"},\"name\":\"Ayla\"}}]},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"character\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"},\"name\":\"Ayla\"},\"state\":{\"level\":1,\"gold\":100},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
+                "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_account_session\",\"account\":{\"accountId\":\"acc_account\",\"accountData\":{},\"slots\":[{\"slotId\":\"autosave\",\"slotInfo\":{\"name\":\"Ayla\"},\"version\":1,\"updatedAt\":\"2026-04-10T00:00:00Z\"}],\"version\":1,\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"slot\":{\"slotId\":\"autosave\",\"slotInfo\":{\"name\":\"Ayla\"},\"data\":{\"level\":1,\"gold\":100},\"version\":1,\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
             var client = BuildClient(transport);
 
-            var result = await client.CreateProfileAsync(new PersistlyCreateProfileRequest(
-                "{\"accountData\":{}}",
-                character: new PersistlyCreateProfileInitialCharacterRequest(
+            var result = await client.CreateAccountAsync(new PersistlyCreateAccountRequest(
+                "{}",
+                slot: new PersistlyCreateAccountInitialSlotRequest(
                     "autosave",
                     "{\"name\":\"Ayla\"}",
                     "{\"level\":1,\"gold\":100}"),
                 playerRef: "player-184"));
 
-            Assert.That(result.Character, Is.Not.Null);
-            Assert.That(result.Character.SaveId, Is.EqualTo("sv_char"));
-            Assert.That(transport.LastRequest.Body, Does.Contain("\"character\""));
-            Assert.That(transport.LastRequest.Body, Does.Contain("\"_persistly\":{\"slotKey\":\"autosave\"}"));
-            Assert.That(client.TryGetLocal("sv_char", out var cachedCharacter), Is.True);
-            Assert.That(cachedCharacter.StateJson, Does.Contain("\"level\":1"));
+            Assert.That(result.Slot, Is.Not.Null);
+            Assert.That(result.Slot.SaveId, Is.EqualTo("autosave"));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"slot\""));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"slotInfo\""));
+            Assert.That(client.TryGetLocal("autosave", out var cachedSlot), Is.True);
+            Assert.That(cachedSlot.StateJson, Does.Contain("\"level\":1"));
         }
 
         [Test]
-        public async Task ProfileCharacterRequestsSendSessionHeader()
+        public async Task AccountSlotRequestsSendSessionHeader()
         {
             var transport = new RecordingTransport(
                 200,
-                "{\"save\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"slot\":1},\"state\":{\"level\":2},\"version\":2,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:01:00Z\"}}");
+                "{\"slotId\":\"autosave\",\"slotInfo\":{\"slot\":1},\"data\":{\"level\":2},\"version\":2,\"updatedAt\":\"2026-04-10T00:01:00Z\"}");
             var client = BuildClient(transport);
 
-            var loaded = await client.LoadProfileCharacterAsync("sv_profile", "pst_profile_session", "sv_char");
+            var loaded = await client.LoadAccountSlotAsync("acc_account", "pst_account_session", "autosave");
 
-            Assert.That(loaded.SaveId, Is.EqualTo("sv_char"));
-            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char"));
-            Assert.That(transport.LastRequest.Headers["X-Persistly-Profile-Session"], Is.EqualTo("pst_profile_session"));
+            Assert.That(loaded.SaveId, Is.EqualTo("autosave"));
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/slots/autosave"));
+            Assert.That(transport.LastRequest.Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_account_session"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-SDK"], Is.EqualTo("unity"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-SDK-Version"], Is.EqualTo("1.0.0"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-Platform"], Is.EqualTo("unity"));
         }
 
         [Test]
-        public async Task SyncProfileAccountDataUsesExplicitRouteAndCachesProfile()
+        public async Task SyncAccountAccountDataUsesExplicitRouteAndCachesAccount()
         {
             var transport = new RecordingTransport(
                 200,
-                "{\"status\":\"accepted\",\"save\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{\"label\":\"Main\"},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{\"diamonds\":30},\"characterSlots\":[]},\"version\":2,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:02:00Z\"}}");
+                "{\"status\":\"accepted\",\"account\":{\"accountId\":\"acc_account\",\"accountData\":{\"diamonds\":30},\"slots\":[],\"version\":2,\"updatedAt\":\"2026-04-10T00:02:00Z\"}}");
             var client = BuildClient(transport);
 
-            var result = await client.SyncProfileAccountDataAsync(
-                "sv_profile",
-                "pst_profile_session",
-                new PersistlySyncProfileAccountDataRequest(1, accountDataPatchJson: "{\"diamonds\":30}"));
+            var result = await client.SyncAccountDataAsync(
+                "acc_account",
+                "pst_account_session",
+                new PersistlySyncAccountDataRequest(1, accountDataPatchJson: "{\"diamonds\":30}"));
 
             Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Accepted));
-            Assert.That(result.Save.SaveId, Is.EqualTo("sv_profile"));
-            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile/account-data/sync"));
+            Assert.That(result.Save.SaveId, Is.EqualTo("acc_account"));
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/data/sync"));
             Assert.That(transport.LastRequest.Body, Does.Contain("\"accountDataPatch\":{\"diamonds\":30}"));
-            Assert.That(client.TryGetLocal("sv_profile", out var cached), Is.True);
+            Assert.That(client.TryGetLocal("acc_account", out var cached), Is.True);
             Assert.That(cached.Version, Is.EqualTo(2));
         }
 
         [Test]
-        public async Task LightweightProfileAccountDataPatchDeletesNullKeysInSynthesizedCache()
+        public async Task LightweightAccountAccountDataPatchDeletesNullKeysInSynthesizedCache()
         {
             var cache = new InMemoryPersistlySaveCache();
             cache.Store(new PersistlySave(
-                "sv_profile",
+                "acc_account",
                 "player-184",
                 "{}",
-                "{\"schema\":\"persistly.profile.v1\",\"accountData\":{\"diamonds\":20,\"oldKey\":\"remove-me\"},\"characterSlots\":[]}",
+                "{\"schema\":\"persistly.account.v1\",\"accountData\":{\"diamonds\":20,\"oldKey\":\"remove-me\"},\"slots\":[]}",
                 1,
                 System.DateTimeOffset.Parse("2026-04-10T00:00:00Z"),
                 System.DateTimeOffset.Parse("2026-04-10T00:00:00Z")));
@@ -117,109 +116,109 @@ namespace Persistly.Unity.LastBeacon.Tests
                 Cache = cache,
             });
 
-            var result = await client.SyncProfileAccountDataAsync(
-                "sv_profile",
-                "pst_profile_session",
-                new PersistlySyncProfileAccountDataRequest(1, accountDataPatchJson: "{\"diamonds\":30,\"oldKey\":null}"));
+            var result = await client.SyncAccountDataAsync(
+                "acc_account",
+                "pst_account_session",
+                new PersistlySyncAccountDataRequest(1, accountDataPatchJson: "{\"diamonds\":30,\"oldKey\":null}"));
 
             Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Accepted));
             Assert.That(result.Save.StateJson, Does.Contain("\"diamonds\":30"));
             Assert.That(result.Save.StateJson, Does.Not.Contain("oldKey"));
-            Assert.That(client.TryGetLocal("sv_profile", out var cached), Is.True);
+            Assert.That(client.TryGetLocal("acc_account", out var cached), Is.True);
             Assert.That(cached.StateJson, Does.Not.Contain("oldKey"));
         }
 
         [Test]
-        public async Task ArchiveProfileCharacterUsesArchiveRouteAndCachesReturnedProfile()
+        public async Task ArchiveAccountSlotUsesArchiveRouteAndCachesReturnedAccount()
         {
             var transport = new RecordingTransport(
                 200,
-                "{\"profileSaveId\":\"sv_profile\",\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[{\"slotKey\":\"autosave\",\"characterSaveId\":\"sv_char\",\"metadata\":{\"_persistly\":{\"slotKey\":\"autosave\"}},\"archived\":true,\"archivedAt\":\"2026-04-10T00:03:00Z\"}]},\"version\":3,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:03:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
+                "{\"accountId\":\"acc_account\",\"account\":{\"accountId\":\"acc_account\",\"accountData\":{},\"slots\":[{\"slotId\":\"autosave\",\"slotInfo\":{},\"archived\":true,\"archivedAt\":\"2026-04-10T00:03:00Z\"}],\"version\":3,\"updatedAt\":\"2026-04-10T00:03:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
             var client = BuildClient(transport);
 
-            var result = await client.ArchiveProfileCharacterAsync("sv_profile", "pst_profile_session", "sv_char");
+            var result = await client.ArchiveSlotAsync("acc_account", "pst_account_session", "autosave");
 
-            Assert.That(result.ProfileSaveId, Is.EqualTo("sv_profile"));
-            Assert.That(result.Profile.StateJson, Does.Contain("\"archived\":true"));
-            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char/archive"));
-            Assert.That(client.TryGetLocal("sv_profile", out var cached), Is.True);
+            Assert.That(result.AccountId, Is.EqualTo("acc_account"));
+            Assert.That(result.Account.StateJson, Does.Contain("\"archived\":true"));
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/slots/autosave/archive"));
+            Assert.That(client.TryGetLocal("acc_account", out var cached), Is.True);
             Assert.That(cached.Version, Is.EqualTo(3));
         }
 
         [Test]
-        public async Task DeleteProfileCharacterUsesDeleteRouteClearsCharacterCacheAndUpdatesProfileCache()
+        public async Task DeleteAccountSlotUsesDeleteRouteClearsSlotCacheAndUpdatesAccountCache()
         {
             var cache = new InMemoryPersistlySaveCache();
             cache.Store(new PersistlySave(
-                "sv_char",
+                "autosave",
                 "player-184",
-                "{\"_persistly\":{\"slotKey\":\"autosave\"}}",
+                "{}",
                 "{\"level\":1}",
                 1,
                 System.DateTimeOffset.Parse("2026-04-10T00:00:00Z"),
                 System.DateTimeOffset.Parse("2026-04-10T00:00:00Z")));
             var transport = new RecordingTransport(
                 200,
-                "{\"profileSaveId\":\"sv_profile\",\"characterSaveId\":\"sv_char\",\"slotKey\":\"autosave\",\"deletedAt\":\"2026-04-10T00:04:00Z\",\"alreadyDeleted\":false,\"cleanupQueued\":true,\"profile\":{\"saveId\":\"sv_profile\",\"playerRef\":\"player-184\",\"metadata\":{},\"state\":{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[]},\"version\":4,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:04:00Z\"}}");
+                "{\"accountId\":\"acc_account\",\"slotId\":\"autosave\",\"deletedAt\":\"2026-04-10T00:04:00Z\",\"alreadyDeleted\":false,\"cleanupQueued\":true,\"account\":{\"accountId\":\"acc_account\",\"accountData\":{},\"slots\":[],\"version\":4,\"updatedAt\":\"2026-04-10T00:04:00Z\"}}");
             var client = new PersistlyClient(new PersistlyClientOptions("ps_test_example")
             {
                 Transport = transport,
                 Cache = cache,
             });
 
-            var result = await client.DeleteProfileCharacterAsync("sv_profile", "pst_profile_session", "sv_char");
+            var result = await client.DeleteAccountSlotAsync("acc_account", "pst_account_session", "autosave");
 
-            Assert.That(result.CharacterSaveId, Is.EqualTo("sv_char"));
+            Assert.That(result.SlotId, Is.EqualTo("autosave"));
             Assert.That(result.CleanupQueued, Is.True);
-            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile/characters/sv_char"));
-            Assert.That(client.TryGetLocal("sv_char", out _), Is.False);
-            Assert.That(client.TryGetLocal("sv_profile", out var cachedProfile), Is.True);
-            Assert.That(cachedProfile.Version, Is.EqualTo(4));
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/slots/autosave"));
+            Assert.That(client.TryGetLocal("autosave", out _), Is.False);
+            Assert.That(client.TryGetLocal("acc_account", out var cachedAccount), Is.True);
+            Assert.That(cachedAccount.Version, Is.EqualTo(4));
         }
 
         [Test]
-        public async Task DeleteProfileUsesDeleteRouteAndClearsProfileCache()
+        public async Task DeleteAccountUsesDeleteRouteAndClearsAccountCache()
         {
             var cache = new InMemoryPersistlySaveCache();
             cache.Store(new PersistlySave(
-                "sv_profile",
+                "acc_account",
                 "player-184",
                 "{}",
-                "{\"schema\":\"persistly.profile.v1\",\"accountData\":{},\"characterSlots\":[]}",
+                "{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[]}",
                 2,
                 System.DateTimeOffset.Parse("2026-04-10T00:00:00Z"),
                 System.DateTimeOffset.Parse("2026-04-10T00:02:00Z")));
             var transport = new RecordingTransport(
                 200,
-                "{\"profileSaveId\":\"sv_profile\",\"deletedAt\":\"2026-04-10T00:05:00Z\",\"deletedCharacterCount\":2,\"alreadyDeleted\":false,\"cleanupQueued\":true}");
+                "{\"accountId\":\"acc_account\",\"deletedAt\":\"2026-04-10T00:05:00Z\",\"deletedSlotCount\":2,\"alreadyDeleted\":false,\"cleanupQueued\":true}");
             var client = new PersistlyClient(new PersistlyClientOptions("ps_test_example")
             {
                 Transport = transport,
                 Cache = cache,
             });
 
-            var result = await client.DeleteProfileAsync("sv_profile", "pst_profile_session");
+            var result = await client.DeleteAccountAsync("acc_account", "pst_account_session");
 
-            Assert.That(result.DeletedCharacterCount, Is.EqualTo(2));
+            Assert.That(result.DeletedSlotCount, Is.EqualTo(2));
             Assert.That(result.CleanupQueued, Is.True);
-            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/profiles/sv_profile"));
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account"));
             Assert.That(transport.LastRequest.Method, Is.EqualTo("DELETE"));
-            Assert.That(client.TryGetLocal("sv_profile", out _), Is.False);
+            Assert.That(client.TryGetLocal("acc_account", out _), Is.False);
         }
 
         [Test]
-        public async Task SyncProfileCharacterReturnsConflictAndCachesCanonicalSave()
+        public async Task SyncAccountSlotReturnsConflictAndCachesCanonicalSave()
         {
             var transport = new StubTransport(
                 409,
-                "{\"status\":\"conflict\",\"save\":{\"saveId\":\"sv_char\",\"playerRef\":\"player-184\",\"metadata\":{\"slot\":1},\"state\":{\"level\":3},\"version\":7,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:08:00Z\"},\"details\":{\"reason\":\"base_version_mismatch\"}}");
+                "{\"status\":\"conflict\",\"slot\":{\"slotId\":\"autosave\",\"slotInfo\":{\"slot\":1},\"data\":{\"level\":3},\"version\":7,\"updatedAt\":\"2026-04-10T00:08:00Z\"},\"details\":{\"reason\":\"base_version_mismatch\"}}");
             var client = BuildClient(transport);
 
-            var result = await client.SyncProfileCharacterAsync("sv_profile", "pst_profile_session", "sv_char", new PersistlySyncSaveRequest("{\"level\":2}", 6, "{\"slot\":1}"));
+            var result = await client.SyncAccountSlotAsync("acc_account", "pst_account_session", "autosave", new PersistlySyncSaveRequest("{\"level\":2}", 6, "{\"slot\":1}"));
 
             Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Conflict));
             Assert.That(result.Save.Version, Is.EqualTo(7));
-            Assert.That(client.TryGetLocal("sv_char", out var cached), Is.True);
+            Assert.That(client.TryGetLocal("autosave", out var cached), Is.True);
             Assert.That(cached.StateJson, Does.Contain("\"level\":3"));
         }
 
@@ -227,17 +226,17 @@ namespace Persistly.Unity.LastBeacon.Tests
         public void ContractErrorsUseTypedErrors()
         {
             Assert.That(
-                PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"slot_already_exists\",\"message\":\"Duplicate slot.\",\"details\":{\"slotKey\":\"autosave\"}}}"),
+                PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"slot_already_exists\",\"message\":\"Duplicate slot.\",\"details\":{\"slotId\":\"autosave\"}}}"),
                 Is.TypeOf<PersistlySlotAlreadyExistsError>());
             Assert.That(
-                PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"character_archived\",\"message\":\"Archived.\",\"details\":{\"characterSaveId\":\"sv_char\"}}}"),
-                Is.TypeOf<PersistlyArchivedCharacterError>());
+                PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"slot_archived\",\"message\":\"Archived.\",\"details\":{\"slotId\":\"autosave\"}}}"),
+                Is.TypeOf<PersistlySlotArchivedError>());
             Assert.That(
-                PersistlyClient.ParseErrorForTests(410, "{\"error\":{\"code\":\"profile_deleted\",\"message\":\"Profile was deleted.\",\"details\":{\"profileSaveId\":\"sv_profile\"}}}"),
-                Is.TypeOf<PersistlyProfileDeletedError>());
+                PersistlyClient.ParseErrorForTests(410, "{\"error\":{\"code\":\"account_deleted\",\"message\":\"Account was deleted.\",\"details\":{\"accountId\":\"acc_account\"}}}"),
+                Is.TypeOf<PersistlyAccountDeletedError>());
             Assert.That(
-                PersistlyClient.ParseErrorForTests(410, "{\"error\":{\"code\":\"character_deleted\",\"message\":\"Character was deleted.\",\"details\":{\"characterSaveId\":\"sv_char\"}}}"),
-                Is.TypeOf<PersistlyCharacterDeletedError>());
+                PersistlyClient.ParseErrorForTests(410, "{\"error\":{\"code\":\"slot_deleted\",\"message\":\"Slot was deleted.\",\"details\":{\"slotId\":\"autosave\"}}}"),
+                Is.TypeOf<PersistlySlotDeletedError>());
             Assert.That(
                 PersistlyClient.ParseErrorForTests(402, "{\"error\":{\"code\":\"monthly_quota_exceeded\",\"message\":\"Monthly runtime request quota exceeded.\",\"details\":{\"planTier\":\"free\",\"used\":100000,\"limit\":100000}}}"),
                 Is.TypeOf<PersistlyMonthlyQuotaExceededError>());
@@ -280,12 +279,12 @@ namespace Persistly.Unity.LastBeacon.Tests
                     return Task.FromResult(new PersistlyAutosaveSyncResult(true, 2));
                 });
 
-            await manager.RecordLocalChangeAsync("sv_profile", "pst_profile_session", "sv_char", "{\"slot\":1}", "{\"level\":2}");
-            Assert.That(store.TryLoad("sv_char", out var draft), Is.True);
+            await manager.RecordLocalChangeAsync("acc_account", "pst_account_session", "autosave", "{\"slot\":1}", "{\"level\":2}");
+            Assert.That(store.TryLoad("autosave", out var draft), Is.True);
             Assert.That(draft.StateJson, Does.Contain("\"level\":2"));
 
-            var first = await manager.ForceSyncAsync("sv_char");
-            var second = await manager.ForceSyncAsync("sv_char");
+            var first = await manager.ForceSyncAsync("autosave");
+            var second = await manager.ForceSyncAsync("autosave");
 
             Assert.That(first.SyncedRemotely, Is.True);
             Assert.That(second.SkippedReason, Is.EqualTo(PersistlyAutosaveSkippedReason.ForceSyncCooldown));
@@ -295,14 +294,14 @@ namespace Persistly.Unity.LastBeacon.Tests
         [Test]
         public async Task CreateSaveStoresCanonicalPayloadInCache()
         {
-            var transport = new StubTransport(201, "{\"save\":{\"saveId\":\"sv_01\",\"playerRef\":\"player-184\",\"metadata\":{\"characterName\":\"Ayla\"},\"state\":{\"Scrap\":12,\"Workers\":1},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"}}");
+            var transport = new StubTransport(201, "{\"save\":{\"saveId\":\"sv_01\",\"playerRef\":\"player-184\",\"slotInfo\":{\"slotName\":\"Ayla\"},\"state\":{\"Scrap\":12,\"Workers\":1},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"}}");
             var client = BuildClient(transport);
 
-            var created = await client.CreateSaveAsync(new PersistlyCreateSaveRequest("{\"Scrap\":12,\"Workers\":1}", "{\"characterName\":\"Ayla\"}", "player-184"));
+            var created = await client.CreateSaveAsync(new PersistlyCreateSaveRequest("{\"Scrap\":12,\"Workers\":1}", "{\"slotName\":\"Ayla\"}", "player-184"));
 
             Assert.That(created.SaveId, Is.EqualTo("sv_01"));
             Assert.That(created.Version, Is.EqualTo(1));
-            Assert.That(created.MetadataJson, Does.Contain("Ayla"));
+            Assert.That(created.SlotInfoJson, Does.Contain("Ayla"));
             Assert.That(client.TryGetLocal("sv_01", out var cached), Is.True);
             Assert.That(cached.StateJson, Does.Contain("\"Scrap\":12"));
         }
@@ -312,10 +311,10 @@ namespace Persistly.Unity.LastBeacon.Tests
         {
             var transport = new StubTransport(
                 409,
-                "{\"status\":\"conflict\",\"save\":{\"saveId\":\"sv_01\",\"playerRef\":\"player-184\",\"metadata\":{\"characterName\":\"Ayla\"},\"state\":{\"Scrap\":77,\"Workers\":3},\"version\":5,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:05:00Z\"},\"details\":{\"reason\":\"base_version_mismatch\"}}");
+                "{\"status\":\"conflict\",\"save\":{\"saveId\":\"sv_01\",\"playerRef\":\"player-184\",\"slotInfo\":{\"slotName\":\"Ayla\"},\"state\":{\"Scrap\":77,\"Workers\":3},\"version\":5,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:05:00Z\"},\"details\":{\"reason\":\"base_version_mismatch\"}}");
             var client = BuildClient(transport);
 
-            var result = await client.SyncSaveAsync("sv_01", new PersistlySyncSaveRequest("{\"Scrap\":14}", 4, "{\"characterName\":\"Ayla\"}"));
+            var result = await client.SyncSaveAsync("sv_01", new PersistlySyncSaveRequest("{\"Scrap\":14}", 4, "{\"slotName\":\"Ayla\"}"));
 
             Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Conflict));
             Assert.That(result.Save.Version, Is.EqualTo(5));

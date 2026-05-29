@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-VERSION="${1:-1.0.0}"
+DRY_RUN=0
+VERSION="1.0.0"
+if [[ "${1:-}" == "--dry-run" ]]; then
+  DRY_RUN=1
+elif [[ "${1:-}" != "" ]]; then
+  VERSION="$1"
+fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DIST_DIR="$ROOT_DIR/dist"
 STAGE_DIR="$DIST_DIR/package"
@@ -16,7 +22,13 @@ done
 
 (
   cd "$STAGE_DIR"
-  tar -czf "$ARCHIVE_PATH" .
+  if [[ "$DRY_RUN" == "0" ]]; then
+    tar -czf "$ARCHIVE_PATH" .
+  fi
 )
 
-echo "$ARCHIVE_PATH"
+if [[ "$DRY_RUN" == "1" ]]; then
+  echo "dry-run package staged at $STAGE_DIR"
+else
+  echo "$ARCHIVE_PATH"
+fi

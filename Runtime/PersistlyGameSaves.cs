@@ -24,7 +24,7 @@ namespace Persistly.Unity
 
     public enum PersistlyGameSaveTarget
     {
-        Profile,
+        Account,
         Slot
     }
 
@@ -71,20 +71,20 @@ namespace Persistly.Unity
     public class PersistlySlotResult
     {
         public PersistlySlotResult(
-            string slotKey,
+            string slotId,
             PersistlySlotStatus status,
             PersistlyGameSaveConflict? conflict = null,
             bool historyRetained = false,
             IReadOnlyList<string>? warnings = null)
         {
-            SlotKey = slotKey;
+            SlotId = slotId;
             Status = status;
             Conflict = conflict;
             HistoryRetained = historyRetained;
             Warnings = warnings ?? Array.Empty<string>();
         }
 
-        public string SlotKey { get; }
+        public string SlotId { get; }
 
         public PersistlySlotStatus Status { get; }
 
@@ -97,17 +97,16 @@ namespace Persistly.Unity
 
     public sealed class PersistlySlotResult<TState> : PersistlySlotResult where TState : class
     {
-        public PersistlySlotResult(string slotKey, PersistlySlotStatus status, TState? state, bool found, PersistlySlotInspection? inspection = null)
-            : base(slotKey, status)
+        public PersistlySlotResult(string slotId, PersistlySlotStatus status, TState? state, bool found, PersistlySlotInspection? inspection = null)
+            : base(slotId, status)
         {
             State = state;
             Found = found;
-            MetadataJson = inspection?.MetadataJson;
+            SlotInfoJson = inspection?.SlotInfoJson;
             Dirty = inspection?.Dirty ?? false;
             Version = inspection?.Version;
-            CharacterSaveId = inspection?.CharacterSaveId;
             CloudStateJson = inspection?.CloudStateJson;
-            CloudMetadataJson = inspection?.CloudMetadataJson;
+            CloudSlotInfoJson = inspection?.CloudSlotInfoJson;
             CloudVersion = inspection?.CloudVersion;
             Archived = inspection?.Archived ?? false;
             UpdatedAt = inspection?.UpdatedAt;
@@ -118,17 +117,15 @@ namespace Persistly.Unity
 
         public bool Found { get; }
 
-        public string? MetadataJson { get; }
+        public string? SlotInfoJson { get; }
 
         public bool Dirty { get; }
 
         public int? Version { get; }
 
-        public string? CharacterSaveId { get; }
-
         public string? CloudStateJson { get; }
 
-        public string? CloudMetadataJson { get; }
+        public string? CloudSlotInfoJson { get; }
 
         public int? CloudVersion { get; }
 
@@ -143,35 +140,35 @@ namespace Persistly.Unity
     {
         public PersistlyGameSaveConflict(
             PersistlyGameSaveTarget target,
-            string? slotKey,
+            string? slotId,
             string? localStateJson,
-            string? localMetadataJson,
+            string? localSlotInfoJson,
             int? localVersion,
             DateTimeOffset? localUpdatedAt,
             string? cloudStateJson,
-            string? cloudMetadataJson,
+            string? cloudSlotInfoJson,
             int? cloudVersion,
             DateTimeOffset? cloudUpdatedAt)
         {
             Target = target;
-            SlotKey = slotKey;
+            SlotId = slotId;
             LocalStateJson = localStateJson;
-            LocalMetadataJson = localMetadataJson;
+            LocalSlotInfoJson = localSlotInfoJson;
             LocalVersion = localVersion;
             LocalUpdatedAt = localUpdatedAt;
             CloudStateJson = cloudStateJson;
-            CloudMetadataJson = cloudMetadataJson;
+            CloudSlotInfoJson = cloudSlotInfoJson;
             CloudVersion = cloudVersion;
             CloudUpdatedAt = cloudUpdatedAt;
         }
 
         public PersistlyGameSaveTarget Target { get; }
 
-        public string? SlotKey { get; }
+        public string? SlotId { get; }
 
         public string? LocalStateJson { get; }
 
-        public string? LocalMetadataJson { get; }
+        public string? LocalSlotInfoJson { get; }
 
         public int? LocalVersion { get; }
 
@@ -179,7 +176,7 @@ namespace Persistly.Unity
 
         public string? CloudStateJson { get; }
 
-        public string? CloudMetadataJson { get; }
+        public string? CloudSlotInfoJson { get; }
 
         public int? CloudVersion { get; }
 
@@ -199,13 +196,13 @@ namespace Persistly.Unity
 
         public string? PlayerRef { get; set; }
 
-        public string? ExternalProfileRefJson { get; set; }
+        public string? ExternalAccountRefJson { get; set; }
 
-        public string? LocalProfileKey { get; set; }
+        public string? LocalAccountKey { get; set; }
 
-        public string? ProfileSaveId { get; set; }
+        public string? AccountId { get; set; }
 
-        public string? ProfileSessionToken { get; set; }
+        public string? AccountSessionToken { get; set; }
 
         public IPersistlyTransport? Transport { get; set; }
 
@@ -218,7 +215,7 @@ namespace Persistly.Unity
 
     public sealed class PersistlySaveSlotOptions
     {
-        public string? MetadataJson { get; set; }
+        public string? SlotInfoJson { get; set; }
     }
 
     public sealed class PersistlySyncOptions
@@ -228,37 +225,37 @@ namespace Persistly.Unity
         public bool IncludeSkipped { get; set; }
     }
 
-    public sealed class PersistlyListSlotsOptions
+    public sealed class PersistlyListSlotDataOptions
     {
         public bool IncludeArchived { get; set; }
     }
 
-    public sealed class PersistlyProfileSessionInfo
+    public sealed class PersistlyAccountSessionInfo
     {
-        public PersistlyProfileSessionInfo(string? profileSaveId, string? profileSessionToken)
+        public PersistlyAccountSessionInfo(string? accountId, string? accountSessionToken)
         {
-            ProfileSaveId = profileSaveId;
-            ProfileSessionToken = profileSessionToken;
+            AccountId = accountId;
+            AccountSessionToken = accountSessionToken;
         }
 
-        public string? ProfileSaveId { get; }
+        public string? AccountId { get; }
 
-        public string? ProfileSessionToken { get; }
+        public string? AccountSessionToken { get; }
     }
 
-    public sealed class PersistlyProfileInspection
+    public sealed class PersistlyAccountInspection
     {
-        public PersistlyProfileInspection(string accountDataJson, string metadataJson, bool dirty, int? version)
+        public PersistlyAccountInspection(string accountDataJson, string slotInfoJson, bool dirty, int? version)
         {
             AccountDataJson = accountDataJson;
-            MetadataJson = metadataJson;
+            SlotInfoJson = slotInfoJson;
             Dirty = dirty;
             Version = version;
         }
 
         public string AccountDataJson { get; }
 
-        public string MetadataJson { get; }
+        public string SlotInfoJson { get; }
 
         public bool Dirty { get; }
 
@@ -268,52 +265,48 @@ namespace Persistly.Unity
     public sealed class PersistlySlotInspection
     {
         public PersistlySlotInspection(
-            string slotKey,
+            string slotId,
             bool exists,
             string? stateJson,
-            string? metadataJson,
+            string? slotInfoJson,
             bool dirty,
             int? version,
-            string? characterSaveId,
             string? cloudStateJson,
-            string? cloudMetadataJson,
+            string? cloudSlotInfoJson,
             int? cloudVersion,
             bool archived,
             DateTimeOffset? updatedAt,
             DateTimeOffset? lastRemoteSyncAt)
         {
-            SlotKey = slotKey;
+            SlotId = slotId;
             Exists = exists;
             StateJson = stateJson;
-            MetadataJson = metadataJson;
+            SlotInfoJson = slotInfoJson;
             Dirty = dirty;
             Version = version;
-            CharacterSaveId = characterSaveId;
             CloudStateJson = cloudStateJson;
-            CloudMetadataJson = cloudMetadataJson;
+            CloudSlotInfoJson = cloudSlotInfoJson;
             CloudVersion = cloudVersion;
             Archived = archived;
             UpdatedAt = updatedAt;
             LastRemoteSyncAt = lastRemoteSyncAt;
         }
 
-        public string SlotKey { get; }
+        public string SlotId { get; }
 
         public bool Exists { get; }
 
         public string? StateJson { get; }
 
-        public string? MetadataJson { get; }
+        public string? SlotInfoJson { get; }
 
         public bool Dirty { get; }
 
         public int? Version { get; }
 
-        public string? CharacterSaveId { get; }
-
         public string? CloudStateJson { get; }
 
-        public string? CloudMetadataJson { get; }
+        public string? CloudSlotInfoJson { get; }
 
         public int? CloudVersion { get; }
 
@@ -326,11 +319,11 @@ namespace Persistly.Unity
 
     public sealed class PersistlySyncNotification
     {
-        public PersistlySyncNotification(PersistlyGameSaveTarget target, PersistlyGameSaveStatus status, string? slotKey = null, PersistlyGameSaveConflict? conflict = null)
+        public PersistlySyncNotification(PersistlyGameSaveTarget target, PersistlyGameSaveStatus status, string? slotId = null, PersistlyGameSaveConflict? conflict = null)
         {
             Target = target;
             Status = status;
-            SlotKey = slotKey;
+            SlotId = slotId;
             Conflict = conflict;
         }
 
@@ -338,80 +331,80 @@ namespace Persistly.Unity
 
         public PersistlyGameSaveStatus Status { get; }
 
-        public string? SlotKey { get; }
+        public string? SlotId { get; }
 
         public PersistlyGameSaveConflict? Conflict { get; }
     }
 
     public interface IPersistlyGameSavesStore
     {
-        string? LoadProfileJson(string localProfileKey);
+        string? LoadAccountJson(string localAccountKey);
 
-        void SaveProfileJson(string localProfileKey, string json);
+        void SaveAccountJson(string localAccountKey, string json);
 
-        void DeleteProfileJson(string localProfileKey);
+        void DeleteAccountJson(string localAccountKey);
 
-        string? LoadSlotJson(string localProfileKey, string slotKey);
+        string? LoadSlotJson(string localAccountKey, string slotId);
 
-        void SaveSlotJson(string localProfileKey, string slotKey, string json);
+        void SaveSlotJson(string localAccountKey, string slotId, string json);
 
-        void DeleteSlotJson(string localProfileKey, string slotKey);
+        void DeleteSlotJson(string localAccountKey, string slotId);
 
-        IReadOnlyList<string> ListSlotKeys(string localProfileKey);
+        IReadOnlyList<string> ListSlotIds(string localAccountKey);
     }
 
     public sealed class InMemoryPersistlyGameSavesStore : IPersistlyGameSavesStore
     {
-        private readonly Dictionary<string, string> _profiles = new Dictionary<string, string>(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _accounts = new Dictionary<string, string>(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, string>> _slots = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
 
-        public string? LoadProfileJson(string localProfileKey)
+        public string? LoadAccountJson(string localAccountKey)
         {
-            return _profiles.TryGetValue(localProfileKey, out var value) ? value : null;
+            return _accounts.TryGetValue(localAccountKey, out var value) ? value : null;
         }
 
-        public void SaveProfileJson(string localProfileKey, string json)
+        public void SaveAccountJson(string localAccountKey, string json)
         {
-            _profiles[localProfileKey] = json;
+            _accounts[localAccountKey] = json;
         }
 
-        public void DeleteProfileJson(string localProfileKey)
+        public void DeleteAccountJson(string localAccountKey)
         {
-            _profiles.Remove(localProfileKey);
+            _accounts.Remove(localAccountKey);
         }
 
-        public string? LoadSlotJson(string localProfileKey, string slotKey)
+        public string? LoadSlotJson(string localAccountKey, string slotId)
         {
-            return _slots.TryGetValue(localProfileKey, out var profileSlots) && profileSlots.TryGetValue(slotKey, out var value) ? value : null;
+            return _slots.TryGetValue(localAccountKey, out var accountSlots) && accountSlots.TryGetValue(slotId, out var value) ? value : null;
         }
 
-        public void SaveSlotJson(string localProfileKey, string slotKey, string json)
+        public void SaveSlotJson(string localAccountKey, string slotId, string json)
         {
-            if (!_slots.TryGetValue(localProfileKey, out var profileSlots))
+            if (!_slots.TryGetValue(localAccountKey, out var accountSlots))
             {
-                profileSlots = new Dictionary<string, string>(StringComparer.Ordinal);
-                _slots[localProfileKey] = profileSlots;
+                accountSlots = new Dictionary<string, string>(StringComparer.Ordinal);
+                _slots[localAccountKey] = accountSlots;
             }
 
-            profileSlots[slotKey] = json;
+            accountSlots[slotId] = json;
         }
 
-        public void DeleteSlotJson(string localProfileKey, string slotKey)
+        public void DeleteSlotJson(string localAccountKey, string slotId)
         {
-            if (_slots.TryGetValue(localProfileKey, out var profileSlots))
+            if (_slots.TryGetValue(localAccountKey, out var accountSlots))
             {
-                profileSlots.Remove(slotKey);
+                accountSlots.Remove(slotId);
             }
         }
 
-        public IReadOnlyList<string> ListSlotKeys(string localProfileKey)
+        public IReadOnlyList<string> ListSlotIds(string localAccountKey)
         {
-            if (!_slots.TryGetValue(localProfileKey, out var profileSlots))
+            if (!_slots.TryGetValue(localAccountKey, out var accountSlots))
             {
                 return Array.Empty<string>();
             }
 
-            return new List<string>(profileSlots.Keys);
+            return new List<string>(accountSlots.Keys);
         }
     }
 
@@ -430,51 +423,51 @@ namespace Persistly.Unity
             Directory.CreateDirectory(_rootDirectory);
         }
 
-        public string? LoadProfileJson(string localProfileKey)
+        public string? LoadAccountJson(string localAccountKey)
         {
-            var path = ProfilePath(localProfileKey);
+            var path = AccountPath(localAccountKey);
             return File.Exists(path) ? File.ReadAllText(path) : null;
         }
 
-        public void SaveProfileJson(string localProfileKey, string json)
+        public void SaveAccountJson(string localAccountKey, string json)
         {
-            Directory.CreateDirectory(ProfileDirectory(localProfileKey));
-            File.WriteAllText(ProfilePath(localProfileKey), json);
+            Directory.CreateDirectory(AccountDirectory(localAccountKey));
+            File.WriteAllText(AccountPath(localAccountKey), json);
         }
 
-        public void DeleteProfileJson(string localProfileKey)
+        public void DeleteAccountJson(string localAccountKey)
         {
-            var path = ProfilePath(localProfileKey);
+            var path = AccountPath(localAccountKey);
             if (File.Exists(path))
             {
                 File.Delete(path);
             }
         }
 
-        public string? LoadSlotJson(string localProfileKey, string slotKey)
+        public string? LoadSlotJson(string localAccountKey, string slotId)
         {
-            var path = SlotPath(localProfileKey, slotKey);
+            var path = SlotPath(localAccountKey, slotId);
             return File.Exists(path) ? File.ReadAllText(path) : null;
         }
 
-        public void SaveSlotJson(string localProfileKey, string slotKey, string json)
+        public void SaveSlotJson(string localAccountKey, string slotId, string json)
         {
-            Directory.CreateDirectory(SlotsDirectory(localProfileKey));
-            File.WriteAllText(SlotPath(localProfileKey, slotKey), json);
+            Directory.CreateDirectory(SlotsDirectory(localAccountKey));
+            File.WriteAllText(SlotPath(localAccountKey, slotId), json);
         }
 
-        public void DeleteSlotJson(string localProfileKey, string slotKey)
+        public void DeleteSlotJson(string localAccountKey, string slotId)
         {
-            var path = SlotPath(localProfileKey, slotKey);
+            var path = SlotPath(localAccountKey, slotId);
             if (File.Exists(path))
             {
                 File.Delete(path);
             }
         }
 
-        public IReadOnlyList<string> ListSlotKeys(string localProfileKey)
+        public IReadOnlyList<string> ListSlotIds(string localAccountKey)
         {
-            var directory = SlotsDirectory(localProfileKey);
+            var directory = SlotsDirectory(localAccountKey);
             if (!Directory.Exists(directory))
             {
                 return Array.Empty<string>();
@@ -489,24 +482,24 @@ namespace Persistly.Unity
             return keys;
         }
 
-        private string ProfileDirectory(string localProfileKey)
+        private string AccountDirectory(string localAccountKey)
         {
-            return Path.Combine(_rootDirectory, SafePath(localProfileKey));
+            return Path.Combine(_rootDirectory, SafePath(localAccountKey));
         }
 
-        private string SlotsDirectory(string localProfileKey)
+        private string SlotsDirectory(string localAccountKey)
         {
-            return Path.Combine(ProfileDirectory(localProfileKey), "slots");
+            return Path.Combine(AccountDirectory(localAccountKey), "slots");
         }
 
-        private string ProfilePath(string localProfileKey)
+        private string AccountPath(string localAccountKey)
         {
-            return Path.Combine(ProfileDirectory(localProfileKey), "profile.json");
+            return Path.Combine(AccountDirectory(localAccountKey), "account.json");
         }
 
-        private string SlotPath(string localProfileKey, string slotKey)
+        private string SlotPath(string localAccountKey, string slotId)
         {
-            return Path.Combine(SlotsDirectory(localProfileKey), SafePath(slotKey) + ".json");
+            return Path.Combine(SlotsDirectory(localAccountKey), SafePath(slotId) + ".json");
         }
 
         private static string SafePath(string value)
@@ -522,9 +515,9 @@ namespace Persistly.Unity
 
     public sealed class PersistlyGameSaves
     {
-        public const string DefaultSlotKey = "autosave";
+        public const string DefaultSlotId = "autosave";
 
-        private const string ProfileSchema = "persistly.local.profile.v1";
+        private const string AccountSchema = "persistly.local.account.v1";
         private const string SlotSchema = "persistly.local.slot.v1";
         private const string AnonymousNamespaceSchema = "persistly.local.anonymous.v1";
         private const string AnonymousNamespaceRecordKey = "__persistly_anonymous_namespace__";
@@ -533,18 +526,18 @@ namespace Persistly.Unity
 
         private readonly PersistlyClient _client;
         private readonly IPersistlyGameSavesStore _store;
-        private readonly string _localProfileKey;
+        private readonly string _localAccountKey;
         private readonly Dictionary<string, LocalSlotRecord> _slots = new Dictionary<string, LocalSlotRecord>(StringComparer.Ordinal);
         private readonly object _gate = new object();
-        private LocalProfileRecord _profile;
+        private LocalAccountRecord _account;
 
-        private PersistlyGameSaves(PersistlyGameSavesSettings settings, PersistlyClient client, IPersistlyGameSavesStore store, string localProfileKey, LocalProfileRecord profile)
+        private PersistlyGameSaves(PersistlyGameSavesSettings settings, PersistlyClient client, IPersistlyGameSavesStore store, string localAccountKey, LocalAccountRecord account)
         {
             Settings = settings;
             _client = client;
             _store = store;
-            _localProfileKey = localProfileKey;
-            _profile = profile;
+            _localAccountKey = localAccountKey;
+            _account = account;
             LoadSlots();
         }
 
@@ -576,32 +569,32 @@ namespace Persistly.Unity
             }
 
             var store = settings.Store ?? new InMemoryPersistlyGameSavesStore();
-            var localProfileKey = ResolveLocalProfileKey(settings, store);
-            var profile = LoadProfile(store, localProfileKey, settings);
+            var localAccountKey = ResolveLocalAccountKey(settings, store);
+            var account = LoadAccount(store, localAccountKey, settings);
             var client = new PersistlyClient(new PersistlyClientOptions(settings.BaseUrl, settings.RuntimeKey.Trim())
             {
                 Transport = settings.Transport,
                 UserAgent = "Persistly Unity SDK/1.0.0"
             });
 
-            _shared = new PersistlyGameSaves(settings, client, store, localProfileKey, profile);
-            _shared.SaveProfile();
+            _shared = new PersistlyGameSaves(settings, client, store, localAccountKey, account);
+            _shared.SaveAccount();
             return Task.CompletedTask;
         }
 
-        public PersistlyProfileSessionInfo GetProfileSession(bool includeToken = false)
+        public PersistlyAccountSessionInfo GetAccountSession(bool includeToken = false)
         {
             lock (_gate)
             {
-                return new PersistlyProfileSessionInfo(_profile.ProfileSaveId, includeToken ? _profile.ProfileSessionToken : null);
+                return new PersistlyAccountSessionInfo(_account.AccountId, includeToken ? _account.AccountSessionToken : null);
             }
         }
 
-        public PersistlyProfileInspection InspectProfile()
+        public PersistlyAccountInspection InspectAccount()
         {
             lock (_gate)
             {
-                return new PersistlyProfileInspection(_profile.AccountDataJson, _profile.MetadataJson, _profile.Dirty, _profile.Version);
+                return new PersistlyAccountInspection(_account.AccountDataJson, _account.SlotInfoJson, _account.Dirty, _account.Version);
             }
         }
 
@@ -609,62 +602,61 @@ namespace Persistly.Unity
         {
             lock (_gate)
             {
-                return _profile.AccountDataJson;
+                return _account.AccountDataJson;
             }
         }
 
-        public async Task<PersistlyGameSaveResult> CreateProfileAsync(CancellationToken cancellationToken = default)
+        public async Task<PersistlyGameSaveResult> CreateAccountAsync(CancellationToken cancellationToken = default)
         {
-            await AssertNoExistingLocalProfileStateAsync("create_profile_local_state_exists: Call ClearLocalProfileAsync before creating a different profile.");
-            return await EnsureProfileAsync(cancellationToken);
+            await AssertNoExistingLocalAccountStateAsync("create_account_local_state_exists: Call ClearLocalAccountAsync before creating a different account.");
+            return await EnsureAccountAsync(cancellationToken);
         }
 
-        public async Task<PersistlyGameSaveResult> AttachProfileAsync(string profileSaveId, string profileSessionToken, CancellationToken cancellationToken = default)
+        public async Task<PersistlyGameSaveResult> AttachAccountAsync(string accountId, string accountSessionToken, CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(profileSaveId) || string.IsNullOrWhiteSpace(profileSessionToken))
+            if (string.IsNullOrWhiteSpace(accountId) || string.IsNullOrWhiteSpace(accountSessionToken))
             {
-                throw new PersistlyConfigurationError("attach_profile_invalid_input: AttachProfileAsync requires non-empty profileSaveId and profileSessionToken.");
+                throw new PersistlyConfigurationError("attach_account_invalid_input: AttachAccountAsync requires non-empty accountId and accountSessionToken.");
             }
 
-            await AssertNoExistingLocalProfileStateAsync("attach_profile_local_state_exists: Call ClearLocalProfileAsync before attaching a different profile.");
-            var normalizedProfileSaveId = profileSaveId.Trim();
-            var normalizedProfileSessionToken = profileSessionToken.Trim();
-            var envelope = await _client.LoadProfileAsync(normalizedProfileSaveId, normalizedProfileSessionToken, cancellationToken);
+            await AssertNoExistingLocalAccountStateAsync("attach_account_local_state_exists: Call ClearLocalAccountAsync before attaching a different account.");
+            var normalizedAccountId = accountId.Trim();
+            var normalizedAccountSessionToken = accountSessionToken.Trim();
+            var envelope = await _client.LoadAccountAsync(normalizedAccountId, normalizedAccountSessionToken, cancellationToken);
             lock (_gate)
             {
-                _profile.ProfileSaveId = envelope.ProfileSaveId;
-                _profile.ProfileSessionToken = string.IsNullOrWhiteSpace(envelope.ProfileSessionToken) ? normalizedProfileSessionToken : envelope.ProfileSessionToken;
+                _account.AccountId = envelope.AccountId;
+                _account.AccountSessionToken = string.IsNullOrWhiteSpace(envelope.AccountSessionToken) ? normalizedAccountSessionToken : envelope.AccountSessionToken;
                 if (envelope.SyncPolicy != null)
                 {
-                    _profile.SyncPolicy = envelope.SyncPolicy;
+                    _account.SyncPolicy = envelope.SyncPolicy;
                 }
-                ApplyProfileSave(envelope.Profile, false);
-                _profile.LastRemoteSyncAt = DateTimeOffset.UtcNow;
-                SaveProfile();
+                ApplyAccountSave(envelope.Account, false);
+                _account.LastRemoteSyncAt = DateTimeOffset.UtcNow;
+                SaveAccount();
             }
-            return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Synced);
+            return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Synced);
         }
 
-        public async Task<PersistlyGameSaveResult> EnsureProfileAsync(CancellationToken cancellationToken = default)
+        public async Task<PersistlyGameSaveResult> EnsureAccountAsync(CancellationToken cancellationToken = default)
         {
-            if (HasProfileSession())
+            if (HasAccountSession())
             {
-                if (!_profile.Version.HasValue)
+                if (!_account.Version.HasValue)
                 {
-                    await RestoreProfileAsync(cancellationToken);
-                    return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Synced);
+                    await RestoreAccountAsync(cancellationToken);
+                    return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Synced);
                 }
 
-                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.LocalFound);
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.LocalFound);
             }
 
-            var created = await _client.CreateProfileAsync(new PersistlyCreateProfileRequest(
-                _profile.AccountDataJson,
-                profileMetadataJson: _profile.MetadataJson,
+            var created = await _client.CreateAccountAsync(new PersistlyCreateAccountRequest(
+                _account.AccountDataJson,
                 playerRef: Settings.PlayerRef,
-                externalProfileRefJson: Settings.ExternalProfileRefJson), cancellationToken);
-            ApplyProfileResponse(created, false);
-            return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Synced);
+                externalAccountRefJson: Settings.ExternalAccountRefJson), cancellationToken);
+            ApplyAccountResponse(created, false);
+            return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Synced);
         }
 
         public Task<PersistlyGameSaveResult> SaveAccountDataAsync<TState>(TState accountData)
@@ -672,14 +664,14 @@ namespace Persistly.Unity
             var json = PersistlyJson.CanonicalizeObjectJson(JsonUtility.ToJson(accountData), "accountData");
             lock (_gate)
             {
-                _profile.AccountDataJson = json;
-                _profile.PendingAccountDataPatchJson = null;
-                _profile.Dirty = true;
-                _profile.UpdatedAt = DateTimeOffset.UtcNow;
-                SaveProfile();
+                _account.AccountDataJson = json;
+                _account.PendingAccountDataPatchJson = null;
+                _account.Dirty = true;
+                _account.UpdatedAt = DateTimeOffset.UtcNow;
+                SaveAccount();
             }
 
-            return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.LocalSaved));
+            return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.LocalSaved));
         }
 
         public Task<PersistlyGameSaveResult> PatchAccountDataAsync(string accountDataPatchJson)
@@ -692,7 +684,7 @@ namespace Persistly.Unity
 
             lock (_gate)
             {
-                var account = PersistlyJson.ParseJsonValue(_profile.AccountDataJson, "accountData") as Dictionary<string, object?> ?? new Dictionary<string, object?>(StringComparer.Ordinal);
+                var account = PersistlyJson.ParseJsonValue(_account.AccountDataJson, "accountData") as Dictionary<string, object?> ?? new Dictionary<string, object?>(StringComparer.Ordinal);
                 foreach (var entry in patch)
                 {
                     if (entry.Value == null)
@@ -705,173 +697,172 @@ namespace Persistly.Unity
                     }
                 }
 
-                _profile.AccountDataJson = PersistlyJson.Serialize(account);
-                _profile.PendingAccountDataPatchJson = PersistlyJson.Serialize(patch);
-                _profile.Dirty = true;
-                _profile.UpdatedAt = DateTimeOffset.UtcNow;
-                SaveProfile();
+                _account.AccountDataJson = PersistlyJson.Serialize(account);
+                _account.PendingAccountDataPatchJson = PersistlyJson.Serialize(patch);
+                _account.Dirty = true;
+                _account.UpdatedAt = DateTimeOffset.UtcNow;
+                SaveAccount();
             }
 
-            return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.LocalSaved));
+            return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.LocalSaved));
         }
 
-        public async Task<PersistlyGameSaveResult> ForceSyncProfileAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
+        public async Task<PersistlyGameSaveResult> ForceSyncAccountAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
         {
             options = options ?? new PersistlySyncOptions();
-            if (!_profile.Dirty)
+            if (!_account.Dirty)
             {
-                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.NoChanges);
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.NoChanges);
             }
 
-            if (!options.BypassCooldown && IsInCooldown(_profile.LastForceSyncAt, _profile.SyncPolicy.ForceSyncCooldownSeconds))
+            if (!options.BypassCooldown && IsInCooldown(_account.LastForceSyncAt, _account.SyncPolicy.ForceSyncCooldownSeconds))
             {
-                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Cooldown);
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Cooldown);
             }
 
-            if (HasProfileSession() && !_profile.Version.HasValue)
+            if (HasAccountSession() && !_account.Version.HasValue)
             {
-                await RestoreProfileAsync(cancellationToken, preserveLocalDirty: true);
+                await RestoreAccountAsync(cancellationToken, preserveLocalDirty: true);
             }
             else
             {
-                await EnsureProfileAsync(cancellationToken);
+                await EnsureAccountAsync(cancellationToken);
             }
-            var request = new PersistlySyncProfileAccountDataRequest(
-                _profile.Version ?? 1,
-                accountDataJson: _profile.PendingAccountDataPatchJson == null ? _profile.AccountDataJson : null,
-                accountDataPatchJson: _profile.PendingAccountDataPatchJson);
+            var request = new PersistlySyncAccountDataRequest(
+                _account.Version ?? 1,
+                accountDataJson: _account.PendingAccountDataPatchJson == null ? _account.AccountDataJson : null,
+                accountDataPatchJson: _account.PendingAccountDataPatchJson);
 
             try
             {
-                var response = await _client.SyncProfileAccountDataAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, request, cancellationToken);
+                var response = await _client.SyncAccountDataAsync(_account.AccountId!, _account.AccountSessionToken!, request, cancellationToken);
                 if (response.Status == PersistlySyncStatus.Conflict)
                 {
                     var cloudAccountDataJson = ExtractAccountData(response.Save.StateJson);
-                    var conflict = BuildProfileConflict(response.Save, cloudAccountDataJson);
-                    _profile.CloudAccountDataJson = cloudAccountDataJson;
-                    _profile.CloudVersion = response.Save.Version;
-                    _profile.LastForceSyncAt = DateTimeOffset.UtcNow;
-                    SaveProfile();
-                    Notify(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Conflict, conflict: conflict);
-                    return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Conflict, conflict);
+                    var conflict = BuildAccountConflict(response.Save, cloudAccountDataJson);
+                    _account.CloudAccountDataJson = cloudAccountDataJson;
+                    _account.CloudVersion = response.Save.Version;
+                    _account.LastForceSyncAt = DateTimeOffset.UtcNow;
+                    SaveAccount();
+                    Notify(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Conflict, conflict: conflict);
+                    return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Conflict, conflict);
                 }
 
-                ApplyProfileSave(response.Save, false);
-                _profile.LastForceSyncAt = DateTimeOffset.UtcNow;
-                _profile.LastRemoteSyncAt = _profile.LastForceSyncAt;
-                SaveProfile();
-                Notify(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Synced);
+                ApplyAccountSave(response.Save, false);
+                _account.LastForceSyncAt = DateTimeOffset.UtcNow;
+                _account.LastRemoteSyncAt = _account.LastForceSyncAt;
+                SaveAccount();
+                Notify(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Synced);
                 return new PersistlyGameSaveResult(
-                    PersistlyGameSaveTarget.Profile,
+                    PersistlyGameSaveTarget.Account,
                     PersistlyGameSaveStatus.Synced,
                     historyRetained: response.HistoryRetained,
                     warnings: response.Warnings);
             }
             catch (PersistlyRateLimitedError)
             {
-                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.RateLimited);
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.RateLimited);
             }
             catch (PersistlyTransportError)
             {
-                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Offline);
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Offline);
             }
         }
 
-        public Task<PersistlyGameSaveResult> SyncDueProfileAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
+        public Task<PersistlyGameSaveResult> SyncDueAccountAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
         {
-            if (!_profile.Dirty)
+            if (!_account.Dirty)
             {
-                return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.NoChanges));
+                return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.NoChanges));
             }
 
-            if (IsInCooldown(_profile.LastRemoteSyncAt, _profile.SyncPolicy.MinRemoteSyncIntervalSeconds))
+            if (IsInCooldown(_account.LastRemoteSyncAt, _account.SyncPolicy.MinRemoteSyncIntervalSeconds))
             {
-                return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.Cooldown));
+                return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Cooldown));
             }
 
-            return ForceSyncProfileAsync(new PersistlySyncOptions { BypassCooldown = true }, cancellationToken);
+            return ForceSyncAccountAsync(new PersistlySyncOptions { BypassCooldown = true }, cancellationToken);
         }
 
         public Task<PersistlySlotResult> SaveDataAsync<TState>(TState state, PersistlySaveSlotOptions? options = null)
         {
-            return SaveSlotAsync(DefaultSlotKey, state, options);
+            return SaveSlotAsync(DefaultSlotId, state, options);
         }
 
         public Task<PersistlySlotResult<TState>> LoadDataAsync<TState>() where TState : class
         {
-            return LoadSlotAsync<TState>(DefaultSlotKey);
+            return LoadSlotAsync<TState>(DefaultSlotId);
         }
 
         public PersistlySlotInspection InspectData()
         {
-            return InspectSlot(DefaultSlotKey);
+            return InspectSlot(DefaultSlotId);
         }
 
         public Task<PersistlySlotResult> RefreshDataAsync(CancellationToken cancellationToken = default)
         {
-            return RefreshSlotAsync(DefaultSlotKey, cancellationToken);
+            return RefreshSlotAsync(DefaultSlotId, cancellationToken);
         }
 
         public Task<PersistlySlotResult> ForceSyncDataAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
         {
-            return ForceSyncAsync(DefaultSlotKey, options, cancellationToken);
+            return ForceSyncAsync(DefaultSlotId, options, cancellationToken);
         }
 
-        public Task<PersistlySlotResult> SaveSlotAsync<TState>(string slotKey, TState state, PersistlySaveSlotOptions? options = null)
+        public Task<PersistlySlotResult> SaveSlotAsync<TState>(string slotId, TState state, PersistlySaveSlotOptions? options = null)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             var json = PersistlyJson.CanonicalizeObjectJson(JsonUtility.ToJson(state), "state");
-            var metadata = PersistlyJson.CanonicalizeObjectJson(options?.MetadataJson ?? "{}", "metadata");
-            PersistlyJson.ValidatePayloadSizes(metadata, json);
+            var slotInfo = PersistlyJson.CanonicalizeObjectJson(options?.SlotInfoJson ?? "{}", "slotInfo");
+            PersistlyJson.ValidatePayloadSizes(slotInfo, json);
 
             lock (_gate)
             {
-                if (!_slots.TryGetValue(normalizedSlotKey, out var slot))
+                if (!_slots.TryGetValue(normalizedSlotId, out var slot))
                 {
-                    slot = new LocalSlotRecord(normalizedSlotKey);
-                    _slots[normalizedSlotKey] = slot;
+                    slot = new LocalSlotRecord(normalizedSlotId);
+                    _slots[normalizedSlotId] = slot;
                 }
 
                 if (slot.Archived)
                 {
-                    slot.CharacterSaveId = null;
                     slot.Version = null;
                     slot.CloudStateJson = null;
-                    slot.CloudMetadataJson = null;
+                    slot.CloudSlotInfoJson = null;
                     slot.CloudVersion = null;
                     slot.LastForceSyncAt = null;
                     slot.LastRemoteSyncAt = null;
                 }
 
                 slot.StateJson = json;
-                slot.MetadataJson = metadata;
+                slot.SlotInfoJson = slotInfo;
                 slot.Dirty = true;
                 slot.Archived = false;
                 slot.UpdatedAt = DateTimeOffset.UtcNow;
                 SaveSlot(slot);
             }
 
-            return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved));
+            return Task.FromResult(new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.LocalSaved));
         }
 
-        public Task<PersistlySlotResult<TState>> LoadSlotAsync<TState>(string slotKey) where TState : class
+        public Task<PersistlySlotResult<TState>> LoadSlotAsync<TState>(string slotId) where TState : class
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             lock (_gate)
             {
-                if (!_slots.TryGetValue(normalizedSlotKey, out var slot) || slot.Archived)
+                if (!_slots.TryGetValue(normalizedSlotId, out var slot) || slot.Archived)
                 {
-                    return Task.FromResult(new PersistlySlotResult<TState>(normalizedSlotKey, PersistlySlotStatus.NotFound, null, false));
+                    return Task.FromResult(new PersistlySlotResult<TState>(normalizedSlotId, PersistlySlotStatus.NotFound, null, false));
                 }
 
                 var state = JsonUtility.FromJson<TState>(slot.StateJson);
-                return Task.FromResult(new PersistlySlotResult<TState>(normalizedSlotKey, PersistlySlotStatus.LocalFound, state, true, ToInspection(slot)));
+                return Task.FromResult(new PersistlySlotResult<TState>(normalizedSlotId, PersistlySlotStatus.LocalFound, state, true, ToInspection(slot)));
             }
         }
 
-        public IReadOnlyList<PersistlySlotInspection> ListSlots(PersistlyListSlotsOptions? options = null)
+        public IReadOnlyList<PersistlySlotInspection> ListSlotDataAsync(PersistlyListSlotDataOptions? options = null)
         {
-            options = options ?? new PersistlyListSlotsOptions();
+            options = options ?? new PersistlyListSlotDataOptions();
             lock (_gate)
             {
                 var result = new List<PersistlySlotInspection>();
@@ -889,192 +880,185 @@ namespace Persistly.Unity
             }
         }
 
-        public PersistlySlotInspection InspectSlot(string slotKey)
+        public PersistlySlotInspection InspectSlot(string slotId)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             lock (_gate)
             {
-                if (!_slots.TryGetValue(normalizedSlotKey, out var slot))
+                if (!_slots.TryGetValue(normalizedSlotId, out var slot))
                 {
-                    return new PersistlySlotInspection(normalizedSlotKey, false, null, null, false, null, null, null, null, null, false, null, null);
+                    return new PersistlySlotInspection(normalizedSlotId, false, null, null, false, null, null, null, null, null, false, null, null);
                 }
 
                 return ToInspection(slot);
             }
         }
 
-        public async Task<PersistlySlotResult> RefreshSlotAsync(string slotKey, CancellationToken cancellationToken = default)
+        public async Task<PersistlySlotResult> RefreshSlotAsync(string slotId, CancellationToken cancellationToken = default)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
-            if (!HasProfileSession())
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
+            if (!HasAccountSession())
             {
-                throw new PersistlyConfigurationError("refresh_slot_missing_profile_session: RefreshSlotAsync requires a stored profileSaveId and profileSessionToken.");
+                throw new PersistlyConfigurationError("refresh_slot_missing_account_session: RefreshSlotAsync requires a stored accountId and accountSessionToken.");
             }
 
             try
             {
-                await RestoreProfileAsync(cancellationToken, preserveLocalDirty: true);
+                await RestoreAccountAsync(cancellationToken, preserveLocalDirty: true);
 
                 LocalSlotRecord slot;
-                string expectedCharacterSaveId;
+                string expectedSlotId;
                 lock (_gate)
                 {
-                    if (!_slots.TryGetValue(normalizedSlotKey, out slot) || slot.Archived || string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+                    if (!_slots.TryGetValue(normalizedSlotId, out slot) || slot.Archived)
                     {
-                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+                        return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NotFound);
                     }
-                    expectedCharacterSaveId = slot.CharacterSaveId!;
+                    expectedSlotId = slot.SlotId!;
                 }
 
-                var remoteSave = await _client.LoadProfileCharacterAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, expectedCharacterSaveId, cancellationToken);
+                var remoteSave = await _client.LoadAccountSlotAsync(_account.AccountId!, _account.AccountSessionToken!, expectedSlotId, cancellationToken);
                 lock (_gate)
                 {
-                    if (!_slots.TryGetValue(normalizedSlotKey, out slot) || slot.Archived || !string.Equals(slot.CharacterSaveId, expectedCharacterSaveId, StringComparison.Ordinal))
+                    if (!_slots.TryGetValue(normalizedSlotId, out slot) || slot.Archived || !string.Equals(slot.SlotId, expectedSlotId, StringComparison.Ordinal))
                     {
-                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+                        return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NotFound);
                     }
 
                     if (slot.Dirty)
                     {
                         var conflict = BuildSlotConflict(slot, remoteSave);
                         slot.CloudStateJson = remoteSave.StateJson;
-                        slot.CloudMetadataJson = remoteSave.MetadataJson;
+                        slot.CloudSlotInfoJson = remoteSave.SlotInfoJson;
                         slot.CloudVersion = remoteSave.Version;
                         slot.LastRemoteSyncAt = DateTimeOffset.UtcNow;
                         slot.UpdatedAt = slot.UpdatedAt ?? remoteSave.UpdatedAt;
                         SaveSlot(slot);
-                        Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Conflict, normalizedSlotKey, conflict);
-                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Conflict, conflict);
+                        Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Conflict, normalizedSlotId, conflict);
+                        return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Conflict, conflict);
                     }
 
                     ApplySyncedSlot(slot, remoteSave);
                     SaveSlot(slot);
-                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotId);
+                    return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Synced);
                 }
             }
             catch (PersistlyRateLimitedError)
             {
-                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.RateLimited);
+                return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.RateLimited);
             }
             catch (PersistlyNotFoundError)
             {
-                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+                return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NotFound);
             }
             catch (PersistlyTransportError)
             {
-                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Offline);
+                return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Offline);
             }
         }
 
-        public async Task<PersistlySlotResult> ForceSyncAsync(string slotKey, PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
+        public async Task<PersistlySlotResult> ForceSyncAsync(string slotId, PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
         {
             options = options ?? new PersistlySyncOptions();
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             LocalSlotRecord slot;
             lock (_gate)
             {
-                if (!_slots.TryGetValue(normalizedSlotKey, out slot))
+                if (!_slots.TryGetValue(normalizedSlotId, out slot))
                 {
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+                    return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NotFound);
                 }
 
                 if (!slot.Dirty)
                 {
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NoChanges);
+                    return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NoChanges);
                 }
 
-                if (!options.BypassCooldown && IsInCooldown(slot.LastForceSyncAt, _profile.SyncPolicy.ForceSyncCooldownSeconds))
+                if (!options.BypassCooldown && IsInCooldown(slot.LastForceSyncAt, _account.SyncPolicy.ForceSyncCooldownSeconds))
                 {
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Cooldown);
+                    return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Cooldown);
                 }
             }
 
             try
             {
-                if (!HasProfileSession() && string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+                if (!HasAccountSession())
                 {
-                    var created = await _client.CreateProfileAsync(new PersistlyCreateProfileRequest(
-                        _profile.AccountDataJson,
-                        profileMetadataJson: _profile.MetadataJson,
+                    var created = await _client.CreateAccountAsync(new PersistlyCreateAccountRequest(
+                        _account.AccountDataJson,
                         playerRef: Settings.PlayerRef,
-                        externalProfileRefJson: Settings.ExternalProfileRefJson,
-                        character: new PersistlyCreateProfileInitialCharacterRequest(slot.SlotKey, slot.MetadataJson, slot.StateJson)), cancellationToken);
-                    ApplyProfileResponse(created, false);
-                    ApplySyncedSlot(slot, created.Character!);
+                        externalAccountRefJson: Settings.ExternalAccountRefJson,
+                        slot: new PersistlyCreateAccountInitialSlotRequest(slot.SlotId, slot.SlotInfoJson, slot.StateJson)), cancellationToken);
+                    ApplyAccountResponse(created, false);
+                    ApplySyncedSlot(slot, created.Slot!);
                     SaveSlot(slot);
-                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotId);
+                    return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Synced);
                 }
 
-                await EnsureProfileAsync(cancellationToken);
-                if (string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+                await EnsureAccountAsync(cancellationToken);
+                if (!slot.Version.HasValue)
                 {
                     try
                     {
-                        var created = await _client.CreateProfileCharacterAsync(
-                            _profile.ProfileSaveId!,
-                            _profile.ProfileSessionToken!,
-                            new PersistlyCreateProfileCharacterRequest(slot.SlotKey, slot.MetadataJson, slot.StateJson),
+                        var created = await _client.CreateAccountSlotAsync(
+                            _account.AccountId!,
+                            _account.AccountSessionToken!,
+                            new PersistlyCreateAccountSlotRequest(slot.SlotId, slot.SlotInfoJson, slot.StateJson),
                             cancellationToken);
-                        ApplyProfileResponse(created, false);
-                        ApplySyncedSlot(slot, created.Character!);
+                        ApplyAccountResponse(created, false);
+                        ApplySyncedSlot(slot, created.Slot!);
                         SaveSlot(slot);
-                        Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
-                        return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+                        Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotId);
+                        return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Synced);
                     }
                     catch (PersistlySlotAlreadyExistsError)
                     {
-                        await ReconcileExistingRemoteSlotAsync(normalizedSlotKey, cancellationToken);
+                        await ReconcileExistingRemoteSlotAsync(normalizedSlotId, cancellationToken);
                     }
                 }
 
                 if (!slot.Version.HasValue)
                 {
-                    await ReconcileExistingRemoteSlotAsync(normalizedSlotKey, cancellationToken, restoreProfile: false);
+                    await ReconcileExistingRemoteSlotAsync(normalizedSlotId, cancellationToken, restoreAccount: false);
                 }
 
-                var characterSaveId = slot.CharacterSaveId;
-                if (string.IsNullOrWhiteSpace(characterSaveId))
-                {
-                    throw new PersistlyConfigurationError("Slot is missing a remote character id after profile character reconciliation.");
-                }
-
-                var response = await _client.SyncProfileCharacterAsync(
-                    _profile.ProfileSaveId!,
-                    _profile.ProfileSessionToken!,
-                    characterSaveId,
-                    new PersistlySyncSaveRequest(slot.StateJson, slot.Version, BuildRemoteSlotMetadataJson(slot)),
+                var response = await _client.SyncAccountSlotAsync(
+                    _account.AccountId!,
+                    _account.AccountSessionToken!,
+                    slot.SlotId,
+                    new PersistlySyncSaveRequest(slot.StateJson, slot.Version, BuildRemoteSlotSlotInfoJson(slot)),
                     cancellationToken);
                 slot.LastForceSyncAt = DateTimeOffset.UtcNow;
                 if (response.Status == PersistlySyncStatus.Conflict)
                 {
                     var conflict = BuildSlotConflict(slot, response.Save);
                     slot.CloudStateJson = response.Save.StateJson;
-                    slot.CloudMetadataJson = response.Save.MetadataJson;
+                    slot.CloudSlotInfoJson = response.Save.SlotInfoJson;
                     slot.CloudVersion = response.Save.Version;
                     slot.LastRemoteSyncAt = slot.LastForceSyncAt;
                     SaveSlot(slot);
-                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Conflict, normalizedSlotKey, conflict);
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Conflict, conflict);
+                    Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Conflict, normalizedSlotId, conflict);
+                    return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Conflict, conflict);
                 }
 
                 ApplySyncedSlot(slot, response.Save);
                 SaveSlot(slot);
-                Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotKey);
+                Notify(PersistlyGameSaveTarget.Slot, PersistlyGameSaveStatus.Synced, normalizedSlotId);
                 return new PersistlySlotResult(
-                    normalizedSlotKey,
+                    normalizedSlotId,
                     PersistlySlotStatus.Synced,
                     historyRetained: response.HistoryRetained,
                     warnings: response.Warnings);
             }
             catch (PersistlyRateLimitedError)
             {
-                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.RateLimited);
+                return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.RateLimited);
             }
             catch (PersistlyTransportError)
             {
-                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Offline);
+                return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Offline);
             }
         }
 
@@ -1101,7 +1085,7 @@ namespace Persistly.Unity
                     continue;
                 }
 
-                if (IsInCooldown(inspect.LastRemoteSyncAt, _profile.SyncPolicy.MinRemoteSyncIntervalSeconds))
+                if (IsInCooldown(inspect.LastRemoteSyncAt, _account.SyncPolicy.MinRemoteSyncIntervalSeconds))
                 {
                     if (options.IncludeSkipped)
                     {
@@ -1120,10 +1104,10 @@ namespace Persistly.Unity
         public async Task<IReadOnlyList<object>> SyncDueAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
         {
             var results = new List<object>();
-            var profile = await SyncDueProfileAsync(options, cancellationToken);
-            if (profile.Status != PersistlyGameSaveStatus.NoChanges || (options != null && options.IncludeSkipped))
+            var account = await SyncDueAccountAsync(options, cancellationToken);
+            if (account.Status != PersistlyGameSaveStatus.NoChanges || (options != null && options.IncludeSkipped))
             {
-                results.Add(profile);
+                results.Add(account);
             }
 
             foreach (var result in await SyncDueSlotsAsync(options, cancellationToken))
@@ -1134,164 +1118,164 @@ namespace Persistly.Unity
             return results;
         }
 
-        public async Task<PersistlySlotResult> ArchiveSlotAsync(string slotKey, CancellationToken cancellationToken = default)
+        public async Task<PersistlySlotResult> ArchiveSlotAsync(string slotId, CancellationToken cancellationToken = default)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             LocalSlotRecord slot;
             lock (_gate)
             {
-                if (!_slots.TryGetValue(normalizedSlotKey, out slot))
+                if (!_slots.TryGetValue(normalizedSlotId, out slot))
                 {
-                    return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+                    return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NotFound);
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+            if (!slot.Version.HasValue)
             {
-                throw new PersistlyConfigurationError("archive_slot_unsynced: archiveSlot requires a slot that has already synced to a remote character.");
+                throw new PersistlyConfigurationError("archive_slot_unsynced: archiveSlot requires a slot that has already synced to a remote slot.");
             }
 
-            if (!HasProfileSession())
+            if (!HasAccountSession())
             {
-                throw new PersistlyConfigurationError("archive_slot_missing_profile_session: archiveSlot requires a stored profileSaveId and profileSessionToken.");
+                throw new PersistlyConfigurationError("archive_slot_missing_account_session: archiveSlot requires a stored accountId and accountSessionToken.");
             }
 
-            var response = await _client.ArchiveProfileCharacterAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, slot.CharacterSaveId, cancellationToken);
-            ApplyProfileResponse(response, false);
+            var response = await _client.ArchiveSlotAsync(_account.AccountId!, _account.AccountSessionToken!, slot.SlotId, cancellationToken);
+            ApplyAccountResponse(response, false);
             slot.Archived = true;
             slot.Dirty = false;
             slot.UpdatedAt = DateTimeOffset.UtcNow;
             SaveSlot(slot);
-            return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced);
+            return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Synced);
         }
 
-        public async Task<PersistlyGameSaveResult> DeleteProfileAsync(CancellationToken cancellationToken = default)
+        public async Task<PersistlyGameSaveResult> DeleteAccountAsync(CancellationToken cancellationToken = default)
         {
-            if (!HasProfileSession())
+            if (!HasAccountSession())
             {
-                ResetLocalProfileState();
-                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.LocalSaved);
+                ResetLocalAccountState();
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.LocalSaved);
             }
 
-            var response = await _client.DeleteProfileAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, cancellationToken);
-            ResetLocalProfileState();
+            var response = await _client.DeleteAccountAsync(_account.AccountId!, _account.AccountSessionToken!, cancellationToken);
+            ResetLocalAccountState();
             return new PersistlyGameSaveResult(
-                PersistlyGameSaveTarget.Profile,
+                PersistlyGameSaveTarget.Account,
                 PersistlyGameSaveStatus.Synced,
                 warnings: response.CleanupQueued ? new[] { "delete_cleanup_queued" } : null);
         }
 
-        public async Task<PersistlySlotResult> DeleteSlotAsync(string slotKey, CancellationToken cancellationToken = default)
+        public async Task<PersistlySlotResult> DeleteSlotAsync(string slotId, CancellationToken cancellationToken = default)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             LocalSlotRecord? slot;
             lock (_gate)
             {
-                _slots.TryGetValue(normalizedSlotKey, out slot);
+                _slots.TryGetValue(normalizedSlotId, out slot);
             }
 
             if (slot == null)
             {
-                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound);
+                return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NotFound);
             }
 
-            if (string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+            if (!slot.Version.HasValue)
             {
-                DeleteLocalSlot(normalizedSlotKey);
-                return new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved);
+                DeleteLocalSlot(normalizedSlotId);
+                return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.LocalSaved);
             }
 
-            if (!HasProfileSession())
+            if (!HasAccountSession())
             {
-                throw new PersistlyConfigurationError("delete_slot_missing_profile_session: deleteSlot requires a stored profileSaveId and profileSessionToken.");
+                throw new PersistlyConfigurationError("delete_slot_missing_account_session: deleteSlot requires a stored accountId and accountSessionToken.");
             }
 
-            var response = await _client.DeleteProfileCharacterAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, slot.CharacterSaveId!, cancellationToken);
+            var response = await _client.DeleteAccountSlotAsync(_account.AccountId!, _account.AccountSessionToken!, slot.SlotId!, cancellationToken);
             lock (_gate)
             {
-                _slots.Remove(normalizedSlotKey);
-                _store.DeleteSlotJson(_localProfileKey, normalizedSlotKey);
-                if (response.Profile != null)
+                _slots.Remove(normalizedSlotId);
+                _store.DeleteSlotJson(_localAccountKey, normalizedSlotId);
+                if (response.Account != null)
                 {
-                    ApplyProfileSave(response.Profile, false);
-                    SaveProfile();
+                    ApplyAccountSave(response.Account, false);
+                    SaveAccount();
                 }
             }
 
             return new PersistlySlotResult(
-                normalizedSlotKey,
+                normalizedSlotId,
                 PersistlySlotStatus.Synced,
                 warnings: response.CleanupQueued ? new[] { "delete_cleanup_queued" } : null);
         }
 
-        public Task<PersistlyGameSaveResult> ClearLocalProfileAsync()
+        public Task<PersistlyGameSaveResult> ClearLocalAccountAsync()
         {
-            ResetLocalProfileState();
-            return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Profile, PersistlyGameSaveStatus.LocalSaved));
+            ResetLocalAccountState();
+            return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.LocalSaved));
         }
 
-        public Task<PersistlySlotResult> ClearLocalSlotAsync(string slotKey)
+        public Task<PersistlySlotResult> ClearLocalSlotAsync(string slotId)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
-            DeleteLocalSlot(normalizedSlotKey);
-            return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved));
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
+            DeleteLocalSlot(normalizedSlotId);
+            return Task.FromResult(new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.LocalSaved));
         }
 
         public Task<PersistlySlotResult> AcceptCloudDataAsync()
         {
-            return AcceptCloudVersionAsync(DefaultSlotKey);
+            return AcceptCloudVersionAsync(DefaultSlotId);
         }
 
         public Task<PersistlySlotResult> KeepLocalDataForLaterAsync()
         {
-            return KeepLocalForLaterAsync(DefaultSlotKey);
+            return KeepLocalForLaterAsync(DefaultSlotId);
         }
 
         public Task<PersistlySlotResult> OverwriteCloudDataAsync(PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
         {
-            return OverwriteCloudVersionAsync(DefaultSlotKey, options, cancellationToken);
+            return OverwriteCloudVersionAsync(DefaultSlotId, options, cancellationToken);
         }
 
-        public Task<PersistlySlotResult> AcceptCloudVersionAsync(string slotKey)
+        public Task<PersistlySlotResult> AcceptCloudVersionAsync(string slotId)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             lock (_gate)
             {
-                if (!_slots.TryGetValue(normalizedSlotKey, out var slot) || slot.CloudStateJson == null)
+                if (!_slots.TryGetValue(normalizedSlotId, out var slot) || slot.CloudStateJson == null)
                 {
-                    return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.NotFound));
+                    return Task.FromResult(new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NotFound));
                 }
 
                 slot.StateJson = slot.CloudStateJson;
-                slot.MetadataJson = slot.CloudMetadataJson == null ? slot.MetadataJson : StripPersistlyMetadata(slot.CloudMetadataJson);
+                slot.SlotInfoJson = slot.CloudSlotInfoJson == null ? slot.SlotInfoJson : NormalizeSlotInfoJson(slot.CloudSlotInfoJson);
                 slot.Version = slot.CloudVersion;
                 slot.Dirty = false;
                 SaveSlot(slot);
-                return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.Synced));
+                return Task.FromResult(new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.Synced));
             }
         }
 
-        public Task<PersistlySlotResult> KeepLocalForLaterAsync(string slotKey)
+        public Task<PersistlySlotResult> KeepLocalForLaterAsync(string slotId)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             lock (_gate)
             {
-                if (_slots.TryGetValue(normalizedSlotKey, out var slot))
+                if (_slots.TryGetValue(normalizedSlotId, out var slot))
                 {
                     slot.Dirty = true;
                     SaveSlot(slot);
                 }
             }
 
-            return Task.FromResult(new PersistlySlotResult(normalizedSlotKey, PersistlySlotStatus.LocalSaved));
+            return Task.FromResult(new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.LocalSaved));
         }
 
-        public Task<PersistlySlotResult> OverwriteCloudVersionAsync(string slotKey, PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
+        public Task<PersistlySlotResult> OverwriteCloudVersionAsync(string slotId, PersistlySyncOptions? options = null, CancellationToken cancellationToken = default)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             lock (_gate)
             {
-                if (_slots.TryGetValue(normalizedSlotKey, out var slot) && slot.CloudVersion.HasValue)
+                if (_slots.TryGetValue(normalizedSlotId, out var slot) && slot.CloudVersion.HasValue)
                 {
                     slot.Version = slot.CloudVersion;
                     slot.Dirty = true;
@@ -1301,116 +1285,115 @@ namespace Persistly.Unity
 
             options = options ?? new PersistlySyncOptions { BypassCooldown = true };
             options.BypassCooldown = true;
-            return ForceSyncAsync(normalizedSlotKey, options, cancellationToken);
+            return ForceSyncAsync(normalizedSlotId, options, cancellationToken);
         }
 
 #if UNITY_INCLUDE_TESTS
-        public void AttachCharacterForTests(string slotKey, string characterSaveId, int version)
+        public void AttachSlotForTests(string slotId, int version)
         {
-            var normalizedSlotKey = PersistlySlotKey.Normalize(slotKey);
+            var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             lock (_gate)
             {
-                if (!_slots.TryGetValue(normalizedSlotKey, out var slot))
+                if (!_slots.TryGetValue(normalizedSlotId, out var slot))
                 {
-                    throw new PersistlyConfigurationError("slot_not_found: no local save exists for slotKey.");
+                    throw new PersistlyConfigurationError("slot_not_found: no local save exists for slotId.");
                 }
 
-                slot.CharacterSaveId = characterSaveId;
                 slot.Version = version;
                 SaveSlot(slot);
             }
         }
 #endif
 
-        private void Notify(PersistlyGameSaveTarget target, PersistlyGameSaveStatus status, string? slotKey = null, PersistlyGameSaveConflict? conflict = null)
+        private void Notify(PersistlyGameSaveTarget target, PersistlyGameSaveStatus status, string? slotId = null, PersistlyGameSaveConflict? conflict = null)
         {
-            Settings.OnSyncResult?.Invoke(new PersistlySyncNotification(target, status, slotKey, conflict));
+            Settings.OnSyncResult?.Invoke(new PersistlySyncNotification(target, status, slotId, conflict));
         }
 
-        private void ApplyProfileResponse(PersistlyCreateProfileResponse response, bool dirty)
+        private void ApplyAccountResponse(PersistlyCreateAccountResponse response, bool dirty)
         {
             lock (_gate)
             {
-                _profile.ProfileSaveId = response.ProfileSaveId;
-                if (!string.IsNullOrWhiteSpace(response.ProfileSessionToken))
+                _account.AccountId = response.AccountId;
+                if (!string.IsNullOrWhiteSpace(response.AccountSessionToken))
                 {
-                    _profile.ProfileSessionToken = response.ProfileSessionToken;
+                    _account.AccountSessionToken = response.AccountSessionToken;
                 }
 
-                _profile.SyncPolicy = response.SyncPolicy;
-                ApplyProfileSave(response.Profile, dirty);
-                SaveProfile();
+                _account.SyncPolicy = response.SyncPolicy;
+                ApplyAccountSave(response.Account, dirty);
+                SaveAccount();
             }
         }
 
-        private async Task RestoreProfileAsync(CancellationToken cancellationToken, bool preserveLocalDirty = false)
+        private async Task RestoreAccountAsync(CancellationToken cancellationToken, bool preserveLocalDirty = false)
         {
-            var localAccountDataJson = _profile.AccountDataJson;
-            var localMetadataJson = _profile.MetadataJson;
-            var localPendingAccountDataPatchJson = _profile.PendingAccountDataPatchJson;
-            var localDirty = _profile.Dirty;
-            var envelope = await _client.LoadProfileAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, cancellationToken);
+            var localAccountDataJson = _account.AccountDataJson;
+            var localSlotInfoJson = _account.SlotInfoJson;
+            var localPendingAccountDataPatchJson = _account.PendingAccountDataPatchJson;
+            var localDirty = _account.Dirty;
+            var envelope = await _client.LoadAccountAsync(_account.AccountId!, _account.AccountSessionToken!, cancellationToken);
             lock (_gate)
             {
-                _profile.ProfileSaveId = envelope.ProfileSaveId;
-                if (!string.IsNullOrWhiteSpace(envelope.ProfileSessionToken))
+                _account.AccountId = envelope.AccountId;
+                if (!string.IsNullOrWhiteSpace(envelope.AccountSessionToken))
                 {
-                    _profile.ProfileSessionToken = envelope.ProfileSessionToken;
+                    _account.AccountSessionToken = envelope.AccountSessionToken;
                 }
 
                 if (envelope.SyncPolicy != null)
                 {
-                    _profile.SyncPolicy = envelope.SyncPolicy;
+                    _account.SyncPolicy = envelope.SyncPolicy;
                 }
 
-                ApplyProfileSave(envelope.Profile, false);
+                ApplyAccountSave(envelope.Account, false);
                 if (preserveLocalDirty && localDirty)
                 {
-                    _profile.AccountDataJson = localAccountDataJson;
-                    _profile.MetadataJson = localMetadataJson;
-                    _profile.PendingAccountDataPatchJson = localPendingAccountDataPatchJson;
-                    _profile.Dirty = true;
+                    _account.AccountDataJson = localAccountDataJson;
+                    _account.SlotInfoJson = localSlotInfoJson;
+                    _account.PendingAccountDataPatchJson = localPendingAccountDataPatchJson;
+                    _account.Dirty = true;
                 }
-                _profile.LastRemoteSyncAt = DateTimeOffset.UtcNow;
-                SaveProfile();
+                _account.LastRemoteSyncAt = DateTimeOffset.UtcNow;
+                SaveAccount();
             }
         }
 
-        private void ApplyProfileSave(PersistlySave save, bool dirty)
+        private void ApplyAccountSave(PersistlySave save, bool dirty)
         {
-            var profileState = PersistlyProfileState.Parse(save.StateJson);
-            _profile.ProfileSaveId = save.SaveId;
-            _profile.Version = save.Version;
-            _profile.AccountDataJson = profileState.AccountDataJson;
-            _profile.MetadataJson = save.MetadataJson;
-            _profile.PendingAccountDataPatchJson = null;
-            _profile.Dirty = dirty;
-            _profile.UpdatedAt = save.UpdatedAt;
-            ApplyCharacterSlotRefs(profileState.CharacterSlots);
+            var accountState = PersistlyAccountState.Parse(save.StateJson);
+            _account.AccountId = save.SaveId;
+            _account.Version = save.Version;
+            _account.AccountDataJson = accountState.AccountDataJson;
+            _account.SlotInfoJson = save.SlotInfoJson;
+            _account.PendingAccountDataPatchJson = null;
+            _account.Dirty = dirty;
+            _account.UpdatedAt = save.UpdatedAt;
+            ApplySlotRefs(accountState.Slots);
         }
 
-        private static string ExtractAccountData(string profileStateJson)
+        private static string ExtractAccountData(string accountStateJson)
         {
-            return PersistlyProfileState.Parse(profileStateJson).AccountDataJson;
+            return PersistlyAccountState.Parse(accountStateJson).AccountDataJson;
         }
 
-        private async Task ReconcileExistingRemoteSlotAsync(string slotKey, CancellationToken cancellationToken, bool restoreProfile = true)
+        private async Task ReconcileExistingRemoteSlotAsync(string slotId, CancellationToken cancellationToken, bool restoreAccount = true)
         {
-            if (restoreProfile)
+            if (restoreAccount)
             {
-                await RestoreProfileAsync(cancellationToken, preserveLocalDirty: true);
+                await RestoreAccountAsync(cancellationToken, preserveLocalDirty: true);
             }
 
             LocalSlotRecord slot;
             lock (_gate)
             {
-                if (!_slots.TryGetValue(slotKey, out slot) || string.IsNullOrWhiteSpace(slot.CharacterSaveId))
+                if (!_slots.TryGetValue(slotId, out slot))
                 {
-                    throw new PersistlyConfigurationError("slot_reconcile_failed: Persistly could not find remote slot " + slotKey + " after duplicate slot response.");
+                    throw new PersistlyConfigurationError("slot_reconcile_failed: Persistly could not find remote slot " + slotId + " after duplicate slot response.");
                 }
             }
 
-            var remoteSave = await _client.LoadProfileCharacterAsync(_profile.ProfileSaveId!, _profile.ProfileSessionToken!, slot.CharacterSaveId!, cancellationToken);
+            var remoteSave = await _client.LoadAccountSlotAsync(_account.AccountId!, _account.AccountSessionToken!, slot.SlotId!, cancellationToken);
             lock (_gate)
             {
                 ApplyRemoteSlotSnapshot(slot, remoteSave);
@@ -1418,15 +1401,15 @@ namespace Persistly.Unity
             }
         }
 
-        private async Task AssertNoExistingLocalProfileStateAsync(string message)
+        private async Task AssertNoExistingLocalAccountStateAsync(string message)
         {
-            bool hasLocalProfileState;
+            bool hasLocalAccountState;
             lock (_gate)
             {
-                hasLocalProfileState = !IsBlankLocalProfileState(_profile) || _slots.Count > 0;
+                hasLocalAccountState = !IsBlankLocalAccountState(_account) || _slots.Count > 0;
             }
 
-            if (hasLocalProfileState)
+            if (hasLocalAccountState)
             {
                 throw new PersistlyConfigurationError(message);
             }
@@ -1434,60 +1417,60 @@ namespace Persistly.Unity
             await Task.CompletedTask;
         }
 
-        private static bool IsBlankLocalProfileState(LocalProfileRecord profile)
+        private static bool IsBlankLocalAccountState(LocalAccountRecord account)
         {
-            return string.IsNullOrWhiteSpace(profile.ProfileSaveId)
-                && string.IsNullOrWhiteSpace(profile.ProfileSessionToken)
-                && string.Equals(profile.AccountDataJson, "{}", StringComparison.Ordinal)
-                && string.Equals(profile.MetadataJson, "{}", StringComparison.Ordinal)
-                && !profile.Dirty
-                && !profile.Version.HasValue
-                && profile.CloudAccountDataJson == null
-                && !profile.CloudVersion.HasValue
-                && !profile.UpdatedAt.HasValue
-                && !profile.LastForceSyncAt.HasValue
-                && !profile.LastRemoteSyncAt.HasValue;
+            return string.IsNullOrWhiteSpace(account.AccountId)
+                && string.IsNullOrWhiteSpace(account.AccountSessionToken)
+                && string.Equals(account.AccountDataJson, "{}", StringComparison.Ordinal)
+                && string.Equals(account.SlotInfoJson, "{}", StringComparison.Ordinal)
+                && !account.Dirty
+                && !account.Version.HasValue
+                && account.CloudAccountDataJson == null
+                && !account.CloudVersion.HasValue
+                && !account.UpdatedAt.HasValue
+                && !account.LastForceSyncAt.HasValue
+                && !account.LastRemoteSyncAt.HasValue;
         }
 
-        private void ResetLocalProfileState()
+        private void ResetLocalAccountState()
         {
             lock (_gate)
             {
-                foreach (var slotKey in new List<string>(_slots.Keys))
+                foreach (var slotId in new List<string>(_slots.Keys))
                 {
-                    _store.DeleteSlotJson(_localProfileKey, slotKey);
+                    _store.DeleteSlotJson(_localAccountKey, slotId);
                 }
 
                 _slots.Clear();
-                _store.DeleteProfileJson(_localProfileKey);
-                _profile = CreateClearedProfile(Settings);
+                _store.DeleteAccountJson(_localAccountKey);
+                _account = CreateClearedAccount(Settings);
             }
         }
 
-        private void DeleteLocalSlot(string normalizedSlotKey)
+        private void DeleteLocalSlot(string normalizedSlotId)
         {
             lock (_gate)
             {
-                _slots.Remove(normalizedSlotKey);
-                _store.DeleteSlotJson(_localProfileKey, normalizedSlotKey);
+                _slots.Remove(normalizedSlotId);
+                _store.DeleteSlotJson(_localAccountKey, normalizedSlotId);
             }
         }
 
-        private void ApplyCharacterSlotRefs(IReadOnlyList<PersistlyCharacterSlotRef> slotRefs)
+        private void ApplySlotRefs(IReadOnlyList<PersistlySlotRef> slotRefs)
         {
             foreach (var slotRef in slotRefs)
             {
-                var slotKey = PersistlySlotKey.Normalize(slotRef.SlotKey);
-                if (!_slots.TryGetValue(slotKey, out var slot))
+                var slotId = PersistlySlotId.Normalize(slotRef.SlotId);
+                if (!_slots.TryGetValue(slotId, out var slot))
                 {
-                    slot = new LocalSlotRecord(slotKey);
-                    _slots[slotKey] = slot;
+                    slot = new LocalSlotRecord(slotId);
+                    _slots[slotId] = slot;
                 }
 
-                slot.CharacterSaveId = slotRef.CharacterSaveId;
-                if (string.Equals(slot.MetadataJson, "{}", StringComparison.Ordinal))
+                slot.SlotId = slotRef.SlotId;
+                if (string.Equals(slot.SlotInfoJson, "{}", StringComparison.Ordinal))
                 {
-                    slot.MetadataJson = StripPersistlyMetadata(slotRef.MetadataJson);
+                    slot.SlotInfoJson = NormalizeSlotInfoJson(slotRef.SlotInfoJson);
                 }
 
                 slot.Archived = slotRef.Archived;
@@ -1497,27 +1480,27 @@ namespace Persistly.Unity
 
         private static void ApplyRemoteSlotSnapshot(LocalSlotRecord slot, PersistlySave save)
         {
-            slot.CharacterSaveId = save.SaveId;
+            slot.SlotId = save.SaveId;
             slot.Version = save.Version;
             slot.CloudStateJson = save.StateJson;
-            slot.CloudMetadataJson = save.MetadataJson;
+            slot.CloudSlotInfoJson = save.SlotInfoJson;
             slot.CloudVersion = save.Version;
             slot.LastRemoteSyncAt = DateTimeOffset.UtcNow;
             slot.UpdatedAt = save.UpdatedAt;
-            if (string.Equals(slot.MetadataJson, "{}", StringComparison.Ordinal))
+            if (string.Equals(slot.SlotInfoJson, "{}", StringComparison.Ordinal))
             {
-                slot.MetadataJson = StripPersistlyMetadata(save.MetadataJson);
+                slot.SlotInfoJson = NormalizeSlotInfoJson(save.SlotInfoJson);
             }
         }
 
         private void ApplySyncedSlot(LocalSlotRecord slot, PersistlySave save)
         {
-            slot.CharacterSaveId = save.SaveId;
+            slot.SlotId = save.SaveId;
             slot.StateJson = save.StateJson;
-            slot.MetadataJson = StripPersistlyMetadata(save.MetadataJson);
+            slot.SlotInfoJson = NormalizeSlotInfoJson(save.SlotInfoJson);
             slot.Version = save.Version;
             slot.CloudStateJson = save.StateJson;
-            slot.CloudMetadataJson = save.MetadataJson;
+            slot.CloudSlotInfoJson = save.SlotInfoJson;
             slot.CloudVersion = save.Version;
             slot.Dirty = false;
             slot.LastForceSyncAt = DateTimeOffset.UtcNow;
@@ -1525,56 +1508,56 @@ namespace Persistly.Unity
             slot.UpdatedAt = save.UpdatedAt;
         }
 
-        private static string StripPersistlyMetadata(string metadataJson)
+        private static string NormalizeSlotInfoJson(string slotInfoJson)
         {
-            var metadata = PersistlyJson.ParseJsonValue(metadataJson, "metadata") as Dictionary<string, object?>;
-            if (metadata == null)
+            var slotInfo = PersistlyJson.ParseJsonValue(slotInfoJson, "slotInfo") as Dictionary<string, object?>;
+            if (slotInfo == null)
             {
                 return "{}";
             }
 
-            metadata.Remove("_persistly");
-            return PersistlyJson.Serialize(metadata);
+            slotInfo.Remove("_persistly");
+            return PersistlyJson.Serialize(slotInfo);
         }
 
-        private static string BuildRemoteSlotMetadataJson(LocalSlotRecord slot)
+        private static string BuildRemoteSlotSlotInfoJson(LocalSlotRecord slot)
         {
-            return PersistlySlotKey.BuildMetadataJson(slot.SlotKey, slot.MetadataJson);
+            return PersistlySlotId.BuildSlotInfoJson(slot.SlotId, slot.SlotInfoJson);
         }
 
         private PersistlyGameSaveConflict BuildSlotConflict(LocalSlotRecord slot, PersistlySave cloudSave)
         {
             return new PersistlyGameSaveConflict(
                 PersistlyGameSaveTarget.Slot,
-                slot.SlotKey,
+                slot.SlotId,
                 slot.StateJson,
-                slot.MetadataJson,
+                slot.SlotInfoJson,
                 slot.Version,
                 slot.UpdatedAt,
                 cloudSave.StateJson,
-                cloudSave.MetadataJson,
+                cloudSave.SlotInfoJson,
                 cloudSave.Version,
                 cloudSave.UpdatedAt);
         }
 
-        private PersistlyGameSaveConflict BuildProfileConflict(PersistlySave cloudSave, string cloudAccountDataJson)
+        private PersistlyGameSaveConflict BuildAccountConflict(PersistlySave cloudSave, string cloudAccountDataJson)
         {
             return new PersistlyGameSaveConflict(
-                PersistlyGameSaveTarget.Profile,
+                PersistlyGameSaveTarget.Account,
                 null,
-                _profile.AccountDataJson,
-                _profile.MetadataJson,
-                _profile.Version,
-                _profile.UpdatedAt,
+                _account.AccountDataJson,
+                _account.SlotInfoJson,
+                _account.Version,
+                _account.UpdatedAt,
                 cloudAccountDataJson,
-                cloudSave.MetadataJson,
+                cloudSave.SlotInfoJson,
                 cloudSave.Version,
                 cloudSave.UpdatedAt);
         }
 
-        private bool HasProfileSession()
+        private bool HasAccountSession()
         {
-            return !string.IsNullOrWhiteSpace(_profile.ProfileSaveId) && !string.IsNullOrWhiteSpace(_profile.ProfileSessionToken);
+            return !string.IsNullOrWhiteSpace(_account.AccountId) && !string.IsNullOrWhiteSpace(_account.AccountSessionToken);
         }
 
         private static bool IsInCooldown(DateTimeOffset? lastSync, int cooldownSeconds)
@@ -1585,15 +1568,14 @@ namespace Persistly.Unity
         private PersistlySlotInspection ToInspection(LocalSlotRecord slot)
         {
             return new PersistlySlotInspection(
-                slot.SlotKey,
+                slot.SlotId,
                 true,
                 slot.StateJson,
-                slot.MetadataJson,
+                slot.SlotInfoJson,
                 slot.Dirty,
                 slot.Version,
-                slot.CharacterSaveId,
                 slot.CloudStateJson,
-                slot.CloudMetadataJson,
+                slot.CloudSlotInfoJson,
                 slot.CloudVersion,
                 slot.Archived,
                 slot.UpdatedAt,
@@ -1602,82 +1584,82 @@ namespace Persistly.Unity
 
         private void LoadSlots()
         {
-            foreach (var slotKey in _store.ListSlotKeys(_localProfileKey))
+            foreach (var slotId in _store.ListSlotIds(_localAccountKey))
             {
-                var json = _store.LoadSlotJson(_localProfileKey, slotKey);
+                var json = _store.LoadSlotJson(_localAccountKey, slotId);
                 if (string.IsNullOrWhiteSpace(json))
                 {
                     continue;
                 }
 
                 var slot = LocalSlotRecord.FromJson(json!);
-                _slots[slot.SlotKey] = slot;
+                _slots[slot.SlotId] = slot;
             }
         }
 
-        private void SaveProfile()
+        private void SaveAccount()
         {
-            _store.SaveProfileJson(_localProfileKey, _profile.ToJson());
+            _store.SaveAccountJson(_localAccountKey, _account.ToJson());
         }
 
         private void SaveSlot(LocalSlotRecord slot)
         {
-            _store.SaveSlotJson(_localProfileKey, slot.SlotKey, slot.ToJson());
+            _store.SaveSlotJson(_localAccountKey, slot.SlotId, slot.ToJson());
         }
 
-        private static LocalProfileRecord LoadProfile(IPersistlyGameSavesStore store, string localProfileKey, PersistlyGameSavesSettings settings)
+        private static LocalAccountRecord LoadAccount(IPersistlyGameSavesStore store, string localAccountKey, PersistlyGameSavesSettings settings)
         {
-            var json = store.LoadProfileJson(localProfileKey);
-            var profile = string.IsNullOrWhiteSpace(json) ? CreateBlankProfile(settings) : LocalProfileRecord.FromJson(json!);
-            ApplySettingsToProfile(profile, settings);
-            return profile;
+            var json = store.LoadAccountJson(localAccountKey);
+            var account = string.IsNullOrWhiteSpace(json) ? CreateBlankAccount(settings) : LocalAccountRecord.FromJson(json!);
+            ApplySettingsToAccount(account, settings);
+            return account;
         }
 
-        private static LocalProfileRecord CreateBlankProfile(PersistlyGameSavesSettings settings)
+        private static LocalAccountRecord CreateBlankAccount(PersistlyGameSavesSettings settings)
         {
-            var profile = new LocalProfileRecord();
-            ApplySettingsToProfile(profile, settings);
-            return profile;
+            var account = new LocalAccountRecord();
+            ApplySettingsToAccount(account, settings);
+            return account;
         }
 
-        private static LocalProfileRecord CreateClearedProfile(PersistlyGameSavesSettings settings)
+        private static LocalAccountRecord CreateClearedAccount(PersistlyGameSavesSettings settings)
         {
-            var profile = new LocalProfileRecord
+            var account = new LocalAccountRecord
             {
                 PlayerRef = string.IsNullOrWhiteSpace(settings.PlayerRef) ? null : settings.PlayerRef!.Trim(),
-                ExternalProfileRefJson = string.IsNullOrWhiteSpace(settings.ExternalProfileRefJson) ? null : PersistlyJson.CanonicalizeObjectJson(settings.ExternalProfileRefJson!, "externalProfileRef"),
+                ExternalAccountRefJson = string.IsNullOrWhiteSpace(settings.ExternalAccountRefJson) ? null : PersistlyJson.CanonicalizeObjectJson(settings.ExternalAccountRefJson!, "externalAccountRef"),
                 SyncPolicy = settings.SyncPolicy ?? DefaultSyncPolicy
             };
-            return profile;
+            return account;
         }
 
-        private static void ApplySettingsToProfile(LocalProfileRecord profile, PersistlyGameSavesSettings settings)
+        private static void ApplySettingsToAccount(LocalAccountRecord account, PersistlyGameSavesSettings settings)
         {
-            if (!string.IsNullOrWhiteSpace(settings.ProfileSaveId))
+            if (!string.IsNullOrWhiteSpace(settings.AccountId))
             {
-                profile.ProfileSaveId = settings.ProfileSaveId!.Trim();
+                account.AccountId = settings.AccountId!.Trim();
             }
 
-            if (!string.IsNullOrWhiteSpace(settings.ProfileSessionToken))
+            if (!string.IsNullOrWhiteSpace(settings.AccountSessionToken))
             {
-                profile.ProfileSessionToken = settings.ProfileSessionToken!.Trim();
+                account.AccountSessionToken = settings.AccountSessionToken!.Trim();
             }
 
-            profile.PlayerRef = string.IsNullOrWhiteSpace(settings.PlayerRef) ? profile.PlayerRef : settings.PlayerRef!.Trim();
-            profile.ExternalProfileRefJson = string.IsNullOrWhiteSpace(settings.ExternalProfileRefJson) ? profile.ExternalProfileRefJson : PersistlyJson.CanonicalizeObjectJson(settings.ExternalProfileRefJson!, "externalProfileRef");
-            profile.SyncPolicy = settings.SyncPolicy ?? profile.SyncPolicy ?? DefaultSyncPolicy;
+            account.PlayerRef = string.IsNullOrWhiteSpace(settings.PlayerRef) ? account.PlayerRef : settings.PlayerRef!.Trim();
+            account.ExternalAccountRefJson = string.IsNullOrWhiteSpace(settings.ExternalAccountRefJson) ? account.ExternalAccountRefJson : PersistlyJson.CanonicalizeObjectJson(settings.ExternalAccountRefJson!, "externalAccountRef");
+            account.SyncPolicy = settings.SyncPolicy ?? account.SyncPolicy ?? DefaultSyncPolicy;
         }
 
-        private static string ResolveLocalProfileKey(PersistlyGameSavesSettings settings, IPersistlyGameSavesStore store)
+        private static string ResolveLocalAccountKey(PersistlyGameSavesSettings settings, IPersistlyGameSavesStore store)
         {
-            if (!string.IsNullOrWhiteSpace(settings.LocalProfileKey))
+            if (!string.IsNullOrWhiteSpace(settings.LocalAccountKey))
             {
-                return settings.LocalProfileKey!.Trim();
+                return settings.LocalAccountKey!.Trim();
             }
 
-            if (!string.IsNullOrWhiteSpace(settings.ExternalProfileRefJson))
+            if (!string.IsNullOrWhiteSpace(settings.ExternalAccountRefJson))
             {
-                var external = PersistlyJson.ParseJsonValue(settings.ExternalProfileRefJson!, "externalProfileRef") as Dictionary<string, object?>;
+                var external = PersistlyJson.ParseJsonValue(settings.ExternalAccountRefJson!, "externalAccountRef") as Dictionary<string, object?>;
                 if (external != null && external.TryGetValue("provider", out var providerRaw) && providerRaw is string provider && external.TryGetValue("subject", out var subjectRaw) && subjectRaw is string subject)
                 {
                     return provider + ":" + subject;
@@ -1689,12 +1671,12 @@ namespace Persistly.Unity
                 return settings.PlayerRef!.Trim();
             }
 
-            return ResolveAnonymousLocalProfileKey(store);
+            return ResolveAnonymousLocalAccountKey(store);
         }
 
-        private static string ResolveAnonymousLocalProfileKey(IPersistlyGameSavesStore store)
+        private static string ResolveAnonymousLocalAccountKey(IPersistlyGameSavesStore store)
         {
-            var json = store.LoadProfileJson(AnonymousNamespaceRecordKey);
+            var json = store.LoadAccountJson(AnonymousNamespaceRecordKey);
             if (!string.IsNullOrWhiteSpace(json))
             {
                 var root = PersistlyJson.ParseJsonValue(json!, "anonymous namespace") as Dictionary<string, object?>;
@@ -1709,34 +1691,34 @@ namespace Persistly.Unity
                     throw new PersistlyConfigurationError("Unknown Persistly anonymous namespace schema: " + schema + ".");
                 }
 
-                var localProfileKey = ReadString(root, "localProfileKey");
-                if (string.IsNullOrWhiteSpace(localProfileKey))
+                var localAccountKey = ReadString(root, "localAccountKey");
+                if (string.IsNullOrWhiteSpace(localAccountKey))
                 {
-                    throw new PersistlyConfigurationError("anonymous namespace is missing localProfileKey.");
+                    throw new PersistlyConfigurationError("anonymous namespace is missing localAccountKey.");
                 }
 
-                return localProfileKey!;
+                return localAccountKey!;
             }
 
             var generated = "anonymous-" + Guid.NewGuid().ToString("N");
-            store.SaveProfileJson(AnonymousNamespaceRecordKey, PersistlyJson.Serialize(new Dictionary<string, object?>
+            store.SaveAccountJson(AnonymousNamespaceRecordKey, PersistlyJson.Serialize(new Dictionary<string, object?>
             {
                 { "schema", AnonymousNamespaceSchema },
-                { "localProfileKey", generated },
+                { "localAccountKey", generated },
                 { "createdAt", DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture) }
             }));
             return generated;
         }
 
-        private sealed class LocalProfileRecord
+        private sealed class LocalAccountRecord
         {
             public string AccountDataJson = "{}";
-            public string MetadataJson = "{}";
+            public string SlotInfoJson = "{}";
             public string? PendingAccountDataPatchJson;
-            public string? ProfileSaveId;
-            public string? ProfileSessionToken;
+            public string? AccountId;
+            public string? AccountSessionToken;
             public string? PlayerRef;
-            public string? ExternalProfileRefJson;
+            public string? ExternalAccountRefJson;
             public PersistlySyncPolicy SyncPolicy = DefaultSyncPolicy;
             public bool Dirty;
             public int? Version;
@@ -1750,14 +1732,14 @@ namespace Persistly.Unity
             {
                 var payload = new Dictionary<string, object?>
                 {
-                    { "schema", ProfileSchema },
+                    { "schema", AccountSchema },
                     { "accountData", PersistlyJson.ParseJsonValue(AccountDataJson, "accountData") },
-                    { "metadata", PersistlyJson.ParseJsonValue(MetadataJson, "metadata") },
+                    { "slotInfo", PersistlyJson.ParseJsonValue(SlotInfoJson, "slotInfo") },
                     { "pendingAccountDataPatch", PendingAccountDataPatchJson == null ? null : PersistlyJson.ParseJsonValue(PendingAccountDataPatchJson, "accountDataPatch") },
-                    { "profileSaveId", ProfileSaveId },
-                    { "profileSessionToken", ProfileSessionToken },
+                    { "accountId", AccountId },
+                    { "accountSessionToken", AccountSessionToken },
                     { "playerRef", PlayerRef },
-                    { "externalProfileRef", ExternalProfileRefJson == null ? null : PersistlyJson.ParseJsonValue(ExternalProfileRefJson, "externalProfileRef") },
+                    { "externalAccountRef", ExternalAccountRefJson == null ? null : PersistlyJson.ParseJsonValue(ExternalAccountRefJson, "externalAccountRef") },
                     { "dirty", Dirty },
                     { "version", Version },
                     { "cloudAccountData", CloudAccountDataJson == null ? null : PersistlyJson.ParseJsonValue(CloudAccountDataJson, "cloudAccountData") },
@@ -1770,29 +1752,29 @@ namespace Persistly.Unity
                 return PersistlyJson.Serialize(payload);
             }
 
-            public static LocalProfileRecord FromJson(string json)
+            public static LocalAccountRecord FromJson(string json)
             {
-                var root = PersistlyJson.ParseJsonValue(json, "local profile") as Dictionary<string, object?>;
+                var root = PersistlyJson.ParseJsonValue(json, "local account") as Dictionary<string, object?>;
                 if (root == null)
                 {
-                    throw new PersistlyConfigurationError("local profile must be a JSON object.");
+                    throw new PersistlyConfigurationError("local account must be a JSON object.");
                 }
 
                 var schema = ReadString(root, "schema");
-                if (!string.Equals(schema, ProfileSchema, StringComparison.Ordinal))
+                if (!string.Equals(schema, AccountSchema, StringComparison.Ordinal))
                 {
-                    throw new PersistlyConfigurationError("Unknown Persistly local profile schema: " + schema + ".");
+                    throw new PersistlyConfigurationError("Unknown Persistly local account schema: " + schema + ".");
                 }
 
-                var record = new LocalProfileRecord
+                var record = new LocalAccountRecord
                 {
                     AccountDataJson = SerializeObject(root, "accountData", "{}"),
-                    MetadataJson = SerializeObject(root, "metadata", "{}"),
+                    SlotInfoJson = SerializeObject(root, "slotInfo", "{}"),
                     PendingAccountDataPatchJson = SerializeNullableObject(root, "pendingAccountDataPatch"),
-                    ProfileSaveId = ReadString(root, "profileSaveId"),
-                    ProfileSessionToken = ReadString(root, "profileSessionToken"),
+                    AccountId = ReadString(root, "accountId"),
+                    AccountSessionToken = ReadString(root, "accountSessionToken"),
                     PlayerRef = ReadString(root, "playerRef"),
-                    ExternalProfileRefJson = SerializeNullableObject(root, "externalProfileRef"),
+                    ExternalAccountRefJson = SerializeNullableObject(root, "externalAccountRef"),
                     Dirty = ReadBool(root, "dirty"),
                     Version = ReadInt(root, "version"),
                     CloudAccountDataJson = SerializeNullableObject(root, "cloudAccountData"),
@@ -1819,20 +1801,19 @@ namespace Persistly.Unity
 
         private sealed class LocalSlotRecord
         {
-            public LocalSlotRecord(string slotKey)
+            public LocalSlotRecord(string slotId)
             {
-                SlotKey = slotKey;
+                SlotId = slotId;
             }
 
-            public string SlotKey;
+            public string SlotId;
             public string StateJson = "{}";
-            public string MetadataJson = "{}";
-            public string? CharacterSaveId;
+            public string SlotInfoJson = "{}";
             public bool Dirty;
             public bool Archived;
             public int? Version;
             public string? CloudStateJson;
-            public string? CloudMetadataJson;
+            public string? CloudSlotInfoJson;
             public int? CloudVersion;
             public DateTimeOffset? UpdatedAt;
             public DateTimeOffset? LastForceSyncAt;
@@ -1843,15 +1824,14 @@ namespace Persistly.Unity
                 var payload = new Dictionary<string, object?>
                 {
                     { "schema", SlotSchema },
-                    { "slotKey", SlotKey },
+                    { "slotId", SlotId },
                     { "state", PersistlyJson.ParseJsonValue(StateJson, "state") },
-                    { "metadata", PersistlyJson.ParseJsonValue(MetadataJson, "metadata") },
-                    { "characterSaveId", CharacterSaveId },
+                    { "slotInfo", PersistlyJson.ParseJsonValue(SlotInfoJson, "slotInfo") },
                     { "dirty", Dirty },
                     { "archived", Archived },
                     { "version", Version },
                     { "cloudState", CloudStateJson == null ? null : PersistlyJson.ParseJsonValue(CloudStateJson, "cloudState") },
-                    { "cloudMetadata", CloudMetadataJson == null ? null : PersistlyJson.ParseJsonValue(CloudMetadataJson, "cloudMetadata") },
+                    { "cloudSlotInfo", CloudSlotInfoJson == null ? null : PersistlyJson.ParseJsonValue(CloudSlotInfoJson, "cloudSlotInfo") },
                     { "cloudVersion", CloudVersion },
                     { "updatedAt", FormatDate(UpdatedAt) },
                     { "lastForceSyncAt", FormatDate(LastForceSyncAt) },
@@ -1874,16 +1854,15 @@ namespace Persistly.Unity
                     throw new PersistlyConfigurationError("Unknown Persistly local slot schema: " + schema + ".");
                 }
 
-                return new LocalSlotRecord(PersistlySlotKey.Normalize(ReadString(root, "slotKey") ?? ""))
+                return new LocalSlotRecord(PersistlySlotId.Normalize(ReadString(root, "slotId") ?? ""))
                 {
                     StateJson = SerializeObject(root, "state", "{}"),
-                    MetadataJson = SerializeObject(root, "metadata", "{}"),
-                    CharacterSaveId = ReadString(root, "characterSaveId"),
+                    SlotInfoJson = SerializeObject(root, "slotInfo", "{}"),
                     Dirty = ReadBool(root, "dirty"),
                     Archived = ReadBool(root, "archived"),
                     Version = ReadInt(root, "version"),
                     CloudStateJson = SerializeNullableObject(root, "cloudState"),
-                    CloudMetadataJson = SerializeNullableObject(root, "cloudMetadata"),
+                    CloudSlotInfoJson = SerializeNullableObject(root, "cloudSlotInfo"),
                     CloudVersion = ReadInt(root, "cloudVersion"),
                     UpdatedAt = ReadDate(root, "updatedAt"),
                     LastForceSyncAt = ReadDate(root, "lastForceSyncAt"),

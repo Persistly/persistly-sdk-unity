@@ -26,7 +26,7 @@ LOG_PATH="${LOG_PATH:-$(pwd)/unity-live-smoke.log}"
   -projectPath "$PROJECT_PATH" \
   -runTests \
   -testPlatform EditMode \
-  -testFilter Persistly.Unity.LastBeacon.Tests.PersistlyLiveSmokeTests.LiveGameSavesFacadeCreatesLoadsAndSyncsProfileAndSlot \
+  -testFilter Persistly.Unity.LastBeacon.Tests.PersistlyLiveSmokeTests.LiveGameSavesFacadeCreatesLoadsAndSyncsAccountAndSlot \
   -testResults "$RESULTS_PATH" \
   -logFile "$LOG_PATH" \
   -quit
