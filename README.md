@@ -150,6 +150,12 @@ await PersistlyGameSaves.Shared.ForceSyncAccountAsync();
 
 Account data sync preserves server-owned `slots`; it never rewrites slot references from account data.
 
+## Templates
+
+- `templates/one-save` for idle, casual, and one-save games.
+- `templates/multi-slot` for manual saves, campaigns, and slot select screens.
+- `templates/account-slots` for games with sign-in or cross-device restore.
+
 ## Slots And Conflicts
 
 Use named slots for gameplay saves:
