@@ -153,6 +153,53 @@ namespace Persistly.Unity
             return account;
         }
 
+        public async Task<PersistlyCreateTransferCodeResponse> CreateTransferCodeAsync(
+            string accountId,
+            string accountSessionToken,
+            string? deviceLabel = null,
+            int? ttlSeconds = null,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureSaveId(accountId);
+            EnsureSessionToken(accountSessionToken);
+            if (ttlSeconds.HasValue && ttlSeconds.Value < 1)
+            {
+                throw new PersistlyConfigurationError("ttlSeconds must be greater than zero.");
+            }
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/accounts/" + Uri.EscapeDataString(accountId) + "/transfer-codes",
+                BuildCreateTransferCodeBody(deviceLabel, ttlSeconds),
+                cancellationToken,
+                accountSessionToken: accountSessionToken);
+
+            return ParseCreateTransferCodeResponse(response.Body);
+        }
+
+        public async Task<PersistlyCreateAccountResponse> ConsumeTransferCodeAsync(
+            string transferCode,
+            string? deviceLabel = null,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureTransferCode(transferCode);
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/account-transfer-codes/consume",
+                BuildConsumeTransferCodeBody(transferCode, deviceLabel),
+                cancellationToken);
+
+            var consumed = ParseCreateAccountResponse(response.Body);
+            _cache.Store(consumed.Account);
+            if (consumed.Slot != null)
+            {
+                _cache.Store(consumed.Slot);
+            }
+
+            return consumed;
+        }
+
         public async Task<PersistlyDeleteAccountResponse> DeleteAccountAsync(string accountId, string accountSessionToken, CancellationToken cancellationToken = default)
         {
             EnsureSaveId(accountId);
@@ -610,6 +657,43 @@ namespace Persistly.Unity
                 "}";
         }
 
+        private static string BuildCreateTransferCodeBody(string? deviceLabel, int? ttlSeconds)
+        {
+            var body = "{";
+            var hasField = false;
+            if (!string.IsNullOrWhiteSpace(deviceLabel))
+            {
+                body += "\"deviceLabel\":" + PersistlyJson.EscapeJsonString(deviceLabel!.Trim());
+                hasField = true;
+            }
+
+            if (ttlSeconds.HasValue)
+            {
+                if (hasField)
+                {
+                    body += ",";
+                }
+
+                body += "\"ttlSeconds\":" + ttlSeconds.Value.ToString(CultureInfo.InvariantCulture);
+            }
+
+            body += "}";
+            return body;
+        }
+
+        private static string BuildConsumeTransferCodeBody(string transferCode, string? deviceLabel)
+        {
+            var body = "{";
+            body += "\"transferCode\":" + PersistlyJson.EscapeJsonString(transferCode.Trim());
+            if (!string.IsNullOrWhiteSpace(deviceLabel))
+            {
+                body += ",\"deviceLabel\":" + PersistlyJson.EscapeJsonString(deviceLabel!.Trim());
+            }
+
+            body += "}";
+            return body;
+        }
+
         private static string BuildSyncAccountDataBody(PersistlySyncAccountDataRequest request)
         {
             var body = "{";
@@ -644,13 +728,13 @@ namespace Persistly.Unity
             PersistlySave? slot = null;
             if (root.ContainsKey("slot") && root["slot"] != null)
             {
-                slot = ParseSlotAsSave(GetRequiredObject(root, "slot", "account envelope"));
+                slot = ParseSlotObjectAsSave(GetRequiredObject(root, "slot", "account envelope"));
             }
 
             var policy = root.ContainsKey("syncPolicy")
                 ? ParseSyncPolicy(GetRequiredObject(root, "syncPolicy", "account envelope"))
                 : new PersistlySyncPolicy(60, 10, true, true, true, 25);
-            return new PersistlyCreateAccountResponse(accountId, accountSessionToken, ParseAccountAsSave(accountRoot), slot, policy);
+            return new PersistlyCreateAccountResponse(accountId, accountSessionToken, ParseAccountObjectAsSave(accountRoot), slot, policy);
         }
 
         private static PersistlyAccountEnvelope ParseAccountEnvelope(string body)
@@ -665,11 +749,20 @@ namespace Persistly.Unity
             var accountSessionToken = GetOptionalString(accountRoot, "accountSessionToken");
             var save = accountRoot.ContainsKey("save")
                 ? ParseSave(GetRequiredObject(accountRoot, "save", "account envelope"))
-                : ParseAccountAsSave(accountRoot.ContainsKey("account") ? GetRequiredObject(accountRoot, "account", "account envelope") : accountRoot);
+                : ParseAccountObjectAsSave(accountRoot.ContainsKey("account") ? GetRequiredObject(accountRoot, "account", "account envelope") : accountRoot);
             var policy = accountRoot.ContainsKey("syncPolicy")
                 ? ParseSyncPolicy(GetRequiredObject(accountRoot, "syncPolicy", "account envelope"))
                 : null;
             return new PersistlyAccountEnvelope(accountId, accountSessionToken, save, policy);
+        }
+
+        private static PersistlyCreateTransferCodeResponse ParseCreateTransferCodeResponse(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "create transfer code response"), "create transfer code response");
+            return new PersistlyCreateTransferCodeResponse(
+                GetRequiredString(root, "transferCode", "create transfer code response"),
+                GetRequiredString(root, "expiresAt", "create transfer code response"),
+                GetRequiredInt(root, "expiresInSeconds", "create transfer code response"));
         }
 
         private static PersistlyDeleteAccountResponse ParseDeleteAccountResponse(string body)
@@ -700,7 +793,7 @@ namespace Persistly.Unity
             Dictionary<string, object?>? accountRoot;
             if (TryGetObject(root, "account", out accountRoot))
             {
-                account = ParseAccountAsSave(accountRoot!);
+                account = ParseAccountObjectAsSave(accountRoot!);
             }
 
             return new PersistlyDeleteSlotResponse(
@@ -726,7 +819,7 @@ namespace Persistly.Unity
                 return new PersistlySlotEnvelope(ParseSave(GetRequiredObject(slotRoot, "save", "slot envelope")));
             }
 
-            return new PersistlySlotEnvelope(ParseSlotAsSave(slotRoot));
+            return new PersistlySlotEnvelope(ParseSlotObjectAsSave(slotRoot));
         }
 
         private static PersistlyRuntimeConfig ParseRuntimeConfig(string body)
@@ -818,11 +911,11 @@ namespace Persistly.Unity
             }
             else if (TryGetObject(root, "slot", out var slotObject) && slotObject != null)
             {
-                save = ParseSlotAsSave(slotObject);
+                save = ParseSlotObjectAsSave(slotObject);
             }
             else if (TryGetObject(root, "account", out var accountObject) && accountObject != null)
             {
-                save = ParseAccountAsSave(accountObject);
+                save = ParseAccountObjectAsSave(accountObject);
             }
 
             var version = root.ContainsKey("version") ? GetRequiredInt(root, "version", "sync response") : save?.Version ?? 0;
@@ -963,9 +1056,9 @@ namespace Persistly.Unity
             }
 
             var save = root.ContainsKey("slot")
-                ? ParseSlotAsSave(GetRequiredObject(root, "slot", "sync response"))
+                ? ParseSlotObjectAsSave(GetRequiredObject(root, "slot", "sync response"))
                 : root.ContainsKey("account")
-                    ? ParseAccountAsSave(GetRequiredObject(root, "account", "sync response"))
+                    ? ParseAccountObjectAsSave(GetRequiredObject(root, "account", "sync response"))
                     : ParseSave(GetRequiredObject(root, "save", "sync response"));
             var details = GetRequiredObject(root, "details", "sync response");
             var reason = GetRequiredString(details, "reason", "sync response details");
@@ -1004,6 +1097,11 @@ namespace Persistly.Unity
                 updatedAt);
         }
 
+        private static PersistlySave ParseAccountObjectAsSave(Dictionary<string, object?> accountObject)
+        {
+            return accountObject.ContainsKey("saveId") ? ParseSave(accountObject) : ParseAccountAsSave(accountObject);
+        }
+
         private static PersistlySave ParseAccountAsSave(Dictionary<string, object?> accountObject)
         {
             var accountId = GetRequiredString(accountObject, "accountId", "account");
@@ -1023,6 +1121,11 @@ namespace Persistly.Unity
                 : DateTimeOffset.FromUnixTimeSeconds(0);
 
             return new PersistlySave(accountId, GetOptionalString(accountObject, "playerRef"), "{}", PersistlyJson.Serialize(state), version, updatedAt, updatedAt);
+        }
+
+        private static PersistlySave ParseSlotObjectAsSave(Dictionary<string, object?> slotObject)
+        {
+            return slotObject.ContainsKey("saveId") ? ParseSave(slotObject) : ParseSlotAsSave(slotObject);
         }
 
         private static PersistlySave ParseSlotAsSave(Dictionary<string, object?> slotObject)
@@ -1139,6 +1242,31 @@ namespace Persistly.Unity
 
                         return new PersistlyPayloadTooLargeError(statusCode, message, field, maxBytes, detailsJson);
                     }
+
+                    if (code == PersistlyErrorCode.TransferCodeInvalid)
+                    {
+                        return new PersistlyTransferCodeInvalidError(statusCode, message, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.TransferCodeExpired)
+                    {
+                        return new PersistlyTransferCodeExpiredError(statusCode, message, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.TransferCodeConsumed)
+                    {
+                        return new PersistlyTransferCodeConsumedError(statusCode, message, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.TransferCodeRateLimited)
+                    {
+                        return new PersistlyTransferCodeRateLimitedError(statusCode, message, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.TransferCodeDisabled)
+                    {
+                        return new PersistlyTransferCodeDisabledError(statusCode, message, detailsJson);
+                    }
                 }
                 catch (PersistlyConfigurationError)
                 {
@@ -1172,6 +1300,16 @@ namespace Persistly.Unity
                     return new PersistlyMonthlyQuotaExceededError(statusCode, message, null, null, null, detailsJson);
                 case PersistlyErrorCode.PayloadTooLarge:
                     return new PersistlyPayloadTooLargeError(statusCode, message, null, null, detailsJson);
+                case PersistlyErrorCode.TransferCodeInvalid:
+                    return new PersistlyTransferCodeInvalidError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.TransferCodeExpired:
+                    return new PersistlyTransferCodeExpiredError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.TransferCodeConsumed:
+                    return new PersistlyTransferCodeConsumedError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.TransferCodeRateLimited:
+                    return new PersistlyTransferCodeRateLimitedError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.TransferCodeDisabled:
+                    return new PersistlyTransferCodeDisabledError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.ServerError:
                 default:
                     return new PersistlyServerError(statusCode, message, detailsJson);
@@ -1206,6 +1344,16 @@ namespace Persistly.Unity
                     return PersistlyErrorCode.MonthlyQuotaExceeded;
                 case "payload_too_large":
                     return PersistlyErrorCode.PayloadTooLarge;
+                case "transfer_code_invalid":
+                    return PersistlyErrorCode.TransferCodeInvalid;
+                case "transfer_code_expired":
+                    return PersistlyErrorCode.TransferCodeExpired;
+                case "transfer_code_consumed":
+                    return PersistlyErrorCode.TransferCodeConsumed;
+                case "transfer_code_rate_limited":
+                    return PersistlyErrorCode.TransferCodeRateLimited;
+                case "transfer_code_disabled":
+                    return PersistlyErrorCode.TransferCodeDisabled;
                 case "server_error":
                     return PersistlyErrorCode.ServerError;
                 default:
@@ -1299,6 +1447,14 @@ namespace Persistly.Unity
             if (string.IsNullOrWhiteSpace(accountSessionToken))
             {
                 throw new PersistlyConfigurationError("accountSessionToken must be set.");
+            }
+        }
+
+        private static void EnsureTransferCode(string transferCode)
+        {
+            if (string.IsNullOrWhiteSpace(transferCode))
+            {
+                throw new PersistlyConfigurationError("transferCode must be set.");
             }
         }
 

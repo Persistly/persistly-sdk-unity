@@ -17,6 +17,11 @@ namespace Persistly.Unity
         RateLimited,
         MonthlyQuotaExceeded,
         PayloadTooLarge,
+        TransferCodeInvalid,
+        TransferCodeExpired,
+        TransferCodeConsumed,
+        TransferCodeRateLimited,
+        TransferCodeDisabled,
         ServerError
     }
 
@@ -182,6 +187,54 @@ namespace Persistly.Unity
         public string? Field { get; }
 
         public int? MaxBytes { get; }
+    }
+
+    public abstract class PersistlyTransferCodeError : PersistlyApiError
+    {
+        protected PersistlyTransferCodeError(int statusCode, PersistlyErrorCode code, string message, string? detailsJson = null)
+            : base(statusCode, code, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyTransferCodeInvalidError : PersistlyTransferCodeError
+    {
+        public PersistlyTransferCodeInvalidError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.TransferCodeInvalid, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyTransferCodeExpiredError : PersistlyTransferCodeError
+    {
+        public PersistlyTransferCodeExpiredError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.TransferCodeExpired, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyTransferCodeConsumedError : PersistlyTransferCodeError
+    {
+        public PersistlyTransferCodeConsumedError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.TransferCodeConsumed, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyTransferCodeRateLimitedError : PersistlyTransferCodeError
+    {
+        public PersistlyTransferCodeRateLimitedError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.TransferCodeRateLimited, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyTransferCodeDisabledError : PersistlyTransferCodeError
+    {
+        public PersistlyTransferCodeDisabledError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.TransferCodeDisabled, message, detailsJson)
+        {
+        }
     }
 
     public sealed class PersistlyServerError : PersistlyApiError

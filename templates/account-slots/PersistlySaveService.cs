@@ -20,6 +20,16 @@ namespace Persistly.Templates.AccountSlots
             await PersistlyGameSaves.Shared.AttachAccountAsync(payload.AccountId, payload.AccountSessionToken);
         }
 
+        public Task<PersistlyCreateTransferCodeResponse> CreateTransferCodeAsync(string deviceLabel)
+        {
+            return PersistlyGameSaves.Shared.CreateTransferCodeAsync(deviceLabel: deviceLabel);
+        }
+
+        public Task<PersistlyGameSaveResult> AttachWithTransferCodeAsync(string transferCode, string deviceLabel)
+        {
+            return PersistlyGameSaves.Shared.AttachWithTransferCodeAsync(transferCode, deviceLabel: deviceLabel);
+        }
+
         public async Task<AccountRestorePayload> ExportAccountForBackendAsync()
         {
             await PersistlyGameSaves.Shared.EnsureAccountAsync();

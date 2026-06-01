@@ -31,6 +31,24 @@ namespace Persistly.Templates.AccountSlots
             await _saves.AttachAccountAsync(restorePayload);
         }
 
+        public async Task FirstDeviceCreateTransferCodeAsync()
+        {
+            var transfer = await _saves.CreateTransferCodeAsync("Old device");
+            ShowTransferCodeToPlayer(transfer.TransferCode, transfer.ExpiresInSeconds);
+        }
+
+        public async Task SecondDeviceAttachWithTransferCodeAsync(string transferCode)
+        {
+            await _saves.AttachWithTransferCodeAsync(transferCode, "New device");
+        }
+
+        private void ShowTransferCodeToPlayer(string transferCode, int expiresInSeconds)
+        {
+            // Display the code in your transfer UI. Do not write it to analytics, crash logs, or debug logs.
+            _ = transferCode;
+            _ = expiresInSeconds;
+        }
+
         private Task SendPersistlySessionToBackendAsync(AccountRestorePayload payload)
         {
             // Replace with your authenticated backend request. Do not log the token.

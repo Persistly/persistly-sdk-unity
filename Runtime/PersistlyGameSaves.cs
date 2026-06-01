@@ -638,6 +638,41 @@ namespace Persistly.Unity
             return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Synced);
         }
 
+        public Task<PersistlyCreateTransferCodeResponse> CreateTransferCodeAsync(
+            string? deviceLabel = null,
+            int? ttlSeconds = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (!HasAccountSession())
+            {
+                throw new PersistlyConfigurationError("create_transfer_code_missing_account_session: CreateTransferCodeAsync requires a stored accountId and accountSessionToken.");
+            }
+
+            return _client.CreateTransferCodeAsync(_account.AccountId!, _account.AccountSessionToken!, deviceLabel, ttlSeconds, cancellationToken);
+        }
+
+        public async Task<PersistlyGameSaveResult> AttachWithTransferCodeAsync(
+            string transferCode,
+            string? deviceLabel = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(transferCode))
+            {
+                throw new PersistlyConfigurationError("attach_transfer_code_invalid_input: AttachWithTransferCodeAsync requires a non-empty transferCode.");
+            }
+
+            await AssertNoExistingLocalAccountStateAsync("attach_transfer_code_local_state_exists: Call ClearLocalAccountAsync before attaching a different account.");
+            var consumed = await _client.ConsumeTransferCodeAsync(transferCode.Trim(), deviceLabel, cancellationToken);
+            ApplyAccountResponse(consumed, false);
+            lock (_gate)
+            {
+                _account.LastRemoteSyncAt = DateTimeOffset.UtcNow;
+                SaveAccount();
+            }
+
+            return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Synced);
+        }
+
         public async Task<PersistlyGameSaveResult> EnsureAccountAsync(CancellationToken cancellationToken = default)
         {
             if (HasAccountSession())
@@ -830,6 +865,7 @@ namespace Persistly.Unity
                     slot.CloudStateJson = null;
                     slot.CloudSlotInfoJson = null;
                     slot.CloudVersion = null;
+                    slot.RemoteSlotKnown = false;
                     slot.LastForceSyncAt = null;
                     slot.LastRemoteSyncAt = null;
                 }
@@ -887,7 +923,7 @@ namespace Persistly.Unity
             {
                 if (!_slots.TryGetValue(normalizedSlotId, out var slot))
                 {
-                    return new PersistlySlotInspection(normalizedSlotId, false, null, null, false, null, null, null, null, null, false, null, null);
+                    return new PersistlySlotInspection(normalizedSlotId, false, null, null, false, null, null, null, null, false, null, null);
                 }
 
                 return ToInspection(slot);
@@ -998,6 +1034,17 @@ namespace Persistly.Unity
                 }
 
                 await EnsureAccountAsync(cancellationToken);
+                if (!slot.Version.HasValue && slot.RemoteSlotKnown)
+                {
+                    try
+                    {
+                        await ReconcileExistingRemoteSlotAsync(normalizedSlotId, cancellationToken, restoreAccount: false);
+                    }
+                    catch (PersistlyNotFoundError)
+                    {
+                    }
+                }
+
                 if (!slot.Version.HasValue)
                 {
                     try
@@ -1143,6 +1190,7 @@ namespace Persistly.Unity
             var response = await _client.ArchiveSlotAsync(_account.AccountId!, _account.AccountSessionToken!, slot.SlotId, cancellationToken);
             ApplyAccountResponse(response, false);
             slot.Archived = true;
+            slot.RemoteSlotKnown = false;
             slot.Dirty = false;
             slot.UpdatedAt = DateTimeOffset.UtcNow;
             SaveSlot(slot);
@@ -1474,6 +1522,7 @@ namespace Persistly.Unity
                 }
 
                 slot.Archived = slotRef.Archived;
+                slot.RemoteSlotKnown = !slotRef.Archived;
                 SaveSlot(slot);
             }
         }
@@ -1485,6 +1534,7 @@ namespace Persistly.Unity
             slot.CloudStateJson = save.StateJson;
             slot.CloudSlotInfoJson = save.SlotInfoJson;
             slot.CloudVersion = save.Version;
+            slot.RemoteSlotKnown = true;
             slot.LastRemoteSyncAt = DateTimeOffset.UtcNow;
             slot.UpdatedAt = save.UpdatedAt;
             if (string.Equals(slot.SlotInfoJson, "{}", StringComparison.Ordinal))
@@ -1502,6 +1552,7 @@ namespace Persistly.Unity
             slot.CloudStateJson = save.StateJson;
             slot.CloudSlotInfoJson = save.SlotInfoJson;
             slot.CloudVersion = save.Version;
+            slot.RemoteSlotKnown = true;
             slot.Dirty = false;
             slot.LastForceSyncAt = DateTimeOffset.UtcNow;
             slot.LastRemoteSyncAt = slot.LastForceSyncAt;
@@ -1811,6 +1862,7 @@ namespace Persistly.Unity
             public string SlotInfoJson = "{}";
             public bool Dirty;
             public bool Archived;
+            public bool RemoteSlotKnown;
             public int? Version;
             public string? CloudStateJson;
             public string? CloudSlotInfoJson;
@@ -1829,6 +1881,7 @@ namespace Persistly.Unity
                     { "slotInfo", PersistlyJson.ParseJsonValue(SlotInfoJson, "slotInfo") },
                     { "dirty", Dirty },
                     { "archived", Archived },
+                    { "remoteSlotKnown", RemoteSlotKnown },
                     { "version", Version },
                     { "cloudState", CloudStateJson == null ? null : PersistlyJson.ParseJsonValue(CloudStateJson, "cloudState") },
                     { "cloudSlotInfo", CloudSlotInfoJson == null ? null : PersistlyJson.ParseJsonValue(CloudSlotInfoJson, "cloudSlotInfo") },
@@ -1860,6 +1913,7 @@ namespace Persistly.Unity
                     SlotInfoJson = SerializeObject(root, "slotInfo", "{}"),
                     Dirty = ReadBool(root, "dirty"),
                     Archived = ReadBool(root, "archived"),
+                    RemoteSlotKnown = ReadBool(root, "remoteSlotKnown"),
                     Version = ReadInt(root, "version"),
                     CloudStateJson = SerializeNullableObject(root, "cloudState"),
                     CloudSlotInfoJson = SerializeNullableObject(root, "cloudSlotInfo"),

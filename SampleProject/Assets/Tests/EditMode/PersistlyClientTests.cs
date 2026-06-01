@@ -75,6 +75,54 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
+        public async Task CreateTransferCodeUsesAccountRouteSessionHeaderAndBody()
+        {
+            var transport = new RecordingTransport(
+                201,
+                "{\"transferCode\":\"P7K2D-M9Q4R\",\"expiresAt\":\"2026-06-01T12:10:00Z\",\"expiresInSeconds\":600}");
+            var client = BuildClient(transport);
+
+            var result = await client.CreateTransferCodeAsync(
+                "acc_account",
+                "pst_account_session",
+                deviceLabel: "Switch",
+                ttlSeconds: 600);
+
+            Assert.That(result.TransferCode, Is.EqualTo("P7K2D-M9Q4R"));
+            Assert.That(result.ExpiresAt, Is.EqualTo("2026-06-01T12:10:00Z"));
+            Assert.That(result.ExpiresInSeconds, Is.EqualTo(600));
+            Assert.That(transport.LastRequest.Method, Is.EqualTo("POST"));
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/transfer-codes"));
+            Assert.That(transport.LastRequest.Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_account_session"));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"deviceLabel\":\"Switch\""));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"ttlSeconds\":600"));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("pst_account_session"));
+        }
+
+        [Test]
+        public async Task ConsumeTransferCodeUsesTopLevelRouteAndCachesAccount()
+        {
+            var transport = new RecordingTransport(
+                200,
+                "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_new_session\",\"account\":{\"accountId\":\"acc_account\",\"accountData\":{\"diamonds\":20},\"slots\":[],\"version\":3,\"updatedAt\":\"2026-06-01T12:01:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
+            var client = BuildClient(transport);
+
+            var result = await client.ConsumeTransferCodeAsync("P7K2D-M9Q4R", deviceLabel: "Laptop");
+
+            Assert.That(result.AccountId, Is.EqualTo("acc_account"));
+            Assert.That(result.AccountSessionToken, Is.EqualTo("pst_new_session"));
+            Assert.That(result.Account.StateJson, Does.Contain("\"diamonds\":20"));
+            Assert.That(transport.LastRequest.Method, Is.EqualTo("POST"));
+            Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/account-transfer-codes/consume"));
+            Assert.That(transport.LastRequest.Headers.ContainsKey("X-Persistly-Account-Session"), Is.False);
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"transferCode\":\"P7K2D-M9Q4R\""));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"deviceLabel\":\"Laptop\""));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("pst_new_session"));
+            Assert.That(client.TryGetLocal("acc_account", out var cached), Is.True);
+            Assert.That(cached.Version, Is.EqualTo(3));
+        }
+
+        [Test]
         public async Task SyncAccountAccountDataUsesExplicitRouteAndCachesAccount()
         {
             var transport = new RecordingTransport(
@@ -240,6 +288,15 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(
                 PersistlyClient.ParseErrorForTests(402, "{\"error\":{\"code\":\"monthly_quota_exceeded\",\"message\":\"Monthly runtime request quota exceeded.\",\"details\":{\"planTier\":\"free\",\"used\":100000,\"limit\":100000}}}"),
                 Is.TypeOf<PersistlyMonthlyQuotaExceededError>());
+            Assert.That(
+                PersistlyClient.ParseErrorForTests(400, "{\"error\":{\"code\":\"transfer_code_invalid\",\"message\":\"Transfer code is invalid.\"}}"),
+                Is.TypeOf<PersistlyTransferCodeInvalidError>());
+            Assert.That(
+                PersistlyClient.ParseErrorForTests(410, "{\"error\":{\"code\":\"transfer_code_expired\",\"message\":\"Transfer code expired.\"}}"),
+                Is.TypeOf<PersistlyTransferCodeExpiredError>());
+            Assert.That(
+                PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"transfer_code_consumed\",\"message\":\"Transfer code was already used.\"}}"),
+                Is.TypeOf<PersistlyTransferCodeConsumedError>());
         }
 
         [Test]

@@ -85,7 +85,20 @@ public sealed class PlayerSaveState
 - `AccountId`
 - `AccountSessionToken`
 
-`playerRef` and `externalAccountRefJson` are optional developer references. They are not authentication, ownership proof, lookup, or recovery APIs. Cross-device restore uses explicit `AccountId` plus `AccountSessionToken`, usually stored by your own trusted backend.
+`playerRef` and `externalAccountRefJson` are optional developer references. They are not authentication or ownership proof APIs.
+Do not use those fields for account lookup or account recovery. Cross-device restore uses explicit `AccountId` plus `AccountSessionToken`, usually stored by your own trusted backend.
+
+Anonymous games can also use short-lived transfer codes when the current device already has a Persistly account session:
+
+```csharp
+var transfer = await PersistlyGameSaves.Shared.CreateTransferCodeAsync(deviceLabel: "Old phone");
+ShowTransferCodeToPlayer(transfer.TransferCode, transfer.ExpiresInSeconds);
+
+await PersistlyGameSaves.Shared.AttachWithTransferCodeAsync("P7K2D-M9Q4R", deviceLabel: "New laptop");
+await PersistlyGameSaves.Shared.RefreshDataAsync();
+```
+
+Transfer codes are temporary, one-use account-session bootstrap codes. They are not authentication credentials, and `AttachWithTransferCodeAsync` requires empty local account/slot state just like `AttachAccountAsync`. If the device already has local progress for another player, call `ClearLocalAccountAsync()` only after the player chooses to replace that local state.
 
 `GetAccountSession()` hides the token by default:
 
@@ -111,6 +124,8 @@ Facade rules:
 - `CreateAccountAsync()` creates and stores one local facade account, then syncs it to Persistly.
 - `CreateAccountAsync()` rejects if local account or slot state already exists.
 - `AttachAccountAsync()` loads an already existing Persistly account into empty local state.
+- `CreateTransferCodeAsync()` requires a stored account session and never returns account data or a session token.
+- `AttachWithTransferCodeAsync()` consumes a transfer code into empty local state and stores the returned account session.
 - If you want to switch players on the same device, call `ClearLocalAccountAsync()` first.
 
 To sign out locally or wipe the current local player namespace:
@@ -194,7 +209,10 @@ Conflicts keep local and cloud state separate. Local gameplay state is never ove
 - `SyncAccountSlotAsync`
 - `SyncAccountDataAsync`
 - `ArchiveSlotAsync`
+- `CreateTransferCodeAsync`
+- `ConsumeTransferCodeAsync`
 - typed `slot_already_exists` and `slot_archived` errors
+- typed transfer-code errors such as `transfer_code_invalid`, `transfer_code_expired`, and `transfer_code_consumed`
 - advanced raw `CreateSaveAsync`, `LoadSaveAsync`, and `SyncSaveAsync`
 
 Account slot requests send `slotId`, `slotInfo`, and `data` directly. Public account and slot responses do not expose internal save ids.

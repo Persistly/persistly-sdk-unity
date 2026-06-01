@@ -232,6 +232,37 @@ namespace Persistly.Unity
         public PersistlyAccountState AccountState => PersistlyAccountState.Parse(Account.StateJson);
     }
 
+    public sealed class PersistlyCreateTransferCodeResponse
+    {
+        public PersistlyCreateTransferCodeResponse(string transferCode, string expiresAt, int expiresInSeconds)
+        {
+            if (string.IsNullOrWhiteSpace(transferCode))
+            {
+                throw new PersistlyConfigurationError("transferCode must be set.");
+            }
+
+            if (string.IsNullOrWhiteSpace(expiresAt))
+            {
+                throw new PersistlyConfigurationError("expiresAt must be set.");
+            }
+
+            if (expiresInSeconds < 1)
+            {
+                throw new PersistlyConfigurationError("expiresInSeconds must be greater than zero.");
+            }
+
+            TransferCode = transferCode;
+            ExpiresAt = expiresAt;
+            ExpiresInSeconds = expiresInSeconds;
+        }
+
+        public string TransferCode { get; }
+
+        public string ExpiresAt { get; }
+
+        public int ExpiresInSeconds { get; }
+    }
+
     public sealed class PersistlyDeleteAccountResponse
     {
         public PersistlyDeleteAccountResponse(string accountId, DateTimeOffset deletedAt, int deletedSlotCount, bool alreadyDeleted, bool cleanupQueued)

@@ -199,6 +199,66 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
+        public async Task FacadeCreateTransferCodeRequiresExistingAccountSession()
+        {
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184"
+            });
+
+            var error = Assert.ThrowsAsync<PersistlyConfigurationError>(() => PersistlyGameSaves.Shared.CreateTransferCodeAsync());
+            Assert.That(error.Message, Does.Contain("requires a stored accountId and accountSessionToken"));
+        }
+
+        [Test]
+        public async Task FacadeCreateTransferCodeUsesStoredAccountSession()
+        {
+            var transport = new QueueTransport(
+                new PersistlyTransportResponse(201, "{\"transferCode\":\"P7K2D-M9Q4R\",\"expiresAt\":\"2026-06-01T12:10:00Z\",\"expiresInSeconds\":600}"));
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                AccountId = "acc_account",
+                AccountSessionToken = "pst_account_session",
+                Transport = transport
+            });
+
+            var result = await PersistlyGameSaves.Shared.CreateTransferCodeAsync(deviceLabel: "Switch", ttlSeconds: 600);
+
+            Assert.That(result.TransferCode, Is.EqualTo("P7K2D-M9Q4R"));
+            Assert.That(transport.Requests[0].Url, Does.EndWith("/api/v1/accounts/acc_account/transfer-codes"));
+            Assert.That(transport.Requests[0].Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_account_session"));
+            Assert.That(transport.Requests[0].Body, Does.Not.Contain("pst_account_session"));
+        }
+
+        [Test]
+        public async Task AttachWithTransferCodeRequiresEmptyLocalStateAndStoresReturnedSession()
+        {
+            var transport = new QueueTransport(
+                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_new_session\",\"account\":{\"accountId\":\"acc_account\",\"accountData\":{\"diamonds\":99},\"slots\":[],\"version\":7,\"updatedAt\":\"2026-06-01T12:01:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":45,\"forceSyncCooldownSeconds\":8,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"));
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                Transport = transport
+            });
+
+            var attached = await PersistlyGameSaves.Shared.AttachWithTransferCodeAsync("P7K2D-M9Q4R", deviceLabel: "Laptop");
+            var exported = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
+            var account = PersistlyGameSaves.Shared.InspectAccount();
+
+            Assert.That(attached.Status, Is.EqualTo(PersistlyGameSaveStatus.Synced));
+            Assert.That(exported.AccountId, Is.EqualTo("acc_account"));
+            Assert.That(exported.AccountSessionToken, Is.EqualTo("pst_new_session"));
+            Assert.That(account.AccountDataJson, Does.Contain("\"diamonds\":99"));
+            Assert.That(transport.Requests[0].Url, Does.EndWith("/api/v1/account-transfer-codes/consume"));
+            Assert.That(transport.Requests[0].Headers.ContainsKey("X-Persistly-Account-Session"), Is.False);
+
+            await PersistlyGameSaves.Shared.SaveSlotAsync("autosave", new TestSaveState { Level = 1, Gold = 10 });
+            var error = Assert.ThrowsAsync<PersistlyConfigurationError>(() => PersistlyGameSaves.Shared.AttachWithTransferCodeAsync("AAAAA-BBBBB"));
+            Assert.That(error.Message, Does.Contain("ClearLocalAccountAsync"));
+        }
+
+        [Test]
         public async Task AccountDataHelpersAreLocalFirstAndPatchTopLevelKeys()
         {
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
