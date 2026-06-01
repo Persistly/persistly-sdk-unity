@@ -1,5 +1,11 @@
 # Persistly Unity SDK
 
+[![CI](https://github.com/Persistly/persistly-sdk-unity/actions/workflows/ci.yml/badge.svg)](https://github.com/Persistly/persistly-sdk-unity/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/Persistly/persistly-sdk-unity?sort=semver)](https://github.com/Persistly/persistly-sdk-unity/releases)
+[![Unity](https://img.shields.io/badge/Unity-2021.3%2B-222c37)](https://unity.com/releases/editor/whats-new/2021.3.0)
+[![license](https://img.shields.io/github/license/Persistly/persistly-sdk-unity.svg)](LICENSE)
+[![docs](https://img.shields.io/badge/docs-persistly.app-6467f2)](https://docs.persistly.app/sdk/unity)
+
 Unity runtime SDK for Persistly account-backed, local-first game saves.
 
 The recommended Unity flow is facade-first:
