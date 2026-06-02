@@ -26,7 +26,7 @@ namespace Persistly.Unity
 
         public IPersistlyTransport? Transport { get; set; }
 
-        public IPersistlySaveCache? Cache { get; set; }
+        public IPersistlyRuntimeCache? Cache { get; set; }
 
         public int TimeoutSeconds { get; set; } = 30;
 
@@ -41,38 +41,6 @@ namespace Persistly.Unity
         public string? EngineVersion { get; set; }
 
         public string? ClientVersion { get; set; }
-    }
-
-    public sealed class PersistlyCreateSaveRequest
-    {
-        public PersistlyCreateSaveRequest(string stateJson, string? slotInfoJson = null, string? playerRef = null)
-        {
-            StateJson = PersistlyJson.CanonicalizeObjectJson(stateJson, "state");
-            SlotInfoJson = slotInfoJson == null ? null : PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
-            PlayerRef = string.IsNullOrWhiteSpace(playerRef) ? null : playerRef.Trim();
-        }
-
-        public string? PlayerRef { get; }
-
-        public string? SlotInfoJson { get; }
-
-        public string StateJson { get; }
-    }
-
-    public sealed class PersistlySyncSaveRequest
-    {
-        public PersistlySyncSaveRequest(string stateJson, int? baseVersion = null, string? slotInfoJson = null)
-        {
-            BaseVersion = baseVersion;
-            StateJson = PersistlyJson.CanonicalizeObjectJson(stateJson, "state");
-            SlotInfoJson = slotInfoJson == null ? null : PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
-        }
-
-        public int? BaseVersion { get; }
-
-        public string? SlotInfoJson { get; }
-
-        public string StateJson { get; }
     }
 
     public sealed class PersistlyCreateAccountRequest
@@ -116,24 +84,40 @@ namespace Persistly.Unity
 
     public sealed class PersistlyCreateAccountSlotRequest
     {
-        public PersistlyCreateAccountSlotRequest(string slotId, string slotInfoJson, string slotDataJson)
+        public PersistlyCreateAccountSlotRequest(string slotId, string slotInfoJson, string dataJson)
         {
             SlotId = PersistlySlotId.Normalize(slotId);
             SlotInfoJson = PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
-            SlotDataJson = PersistlyJson.CanonicalizeObjectJson(slotDataJson, "data");
+            DataJson = PersistlyJson.CanonicalizeObjectJson(dataJson, "data");
         }
 
         public string SlotId { get; }
 
         public string SlotInfoJson { get; }
 
-        public string SlotDataJson { get; }
+        public string DataJson { get; }
     }
 
-    public sealed class PersistlySave
+    public sealed class PersistlySyncAccountSlotRequest
     {
-        public PersistlySave(
-            string saveId,
+        public PersistlySyncAccountSlotRequest(string dataJson, int? baseVersion = null, string? slotInfoJson = null)
+        {
+            BaseVersion = baseVersion;
+            DataJson = PersistlyJson.CanonicalizeObjectJson(dataJson, "data");
+            SlotInfoJson = slotInfoJson == null ? null : PersistlyJson.CanonicalizeObjectJson(slotInfoJson, "slotInfo");
+        }
+
+        public int? BaseVersion { get; }
+
+        public string? SlotInfoJson { get; }
+
+        public string DataJson { get; }
+    }
+
+    public sealed class PersistlyRuntimeRecord
+    {
+        public PersistlyRuntimeRecord(
+            string runtimeId,
             string? playerRef,
             string slotInfoJson,
             string stateJson,
@@ -141,22 +125,22 @@ namespace Persistly.Unity
             DateTimeOffset createdAt,
             DateTimeOffset updatedAt)
         {
-            SaveId = saveId;
+            RuntimeId = runtimeId;
             PlayerRef = playerRef;
             SlotInfoJson = slotInfoJson;
-            StateJson = stateJson;
+            DataJson = stateJson;
             Version = version;
             CreatedAt = createdAt;
             UpdatedAt = updatedAt;
         }
 
-        public string SaveId { get; }
+        public string RuntimeId { get; }
 
         public string? PlayerRef { get; }
 
         public string SlotInfoJson { get; }
 
-        public string StateJson { get; }
+        public string DataJson { get; }
 
         public int Version { get; }
 
@@ -165,19 +149,19 @@ namespace Persistly.Unity
         public DateTimeOffset UpdatedAt { get; }
     }
 
-    public sealed class PersistlySaveEnvelope
+    public sealed class PersistlyRuntimeRecordEnvelope
     {
-        public PersistlySaveEnvelope(PersistlySave save)
+        public PersistlyRuntimeRecordEnvelope(PersistlyRuntimeRecord save)
         {
             Save = save;
         }
 
-        public PersistlySave Save { get; }
+        public PersistlyRuntimeRecord Save { get; }
     }
 
     public sealed class PersistlyAccountEnvelope
     {
-        public PersistlyAccountEnvelope(string accountId, string? accountSessionToken, PersistlySave account, PersistlySyncPolicy? syncPolicy = null)
+        public PersistlyAccountEnvelope(string accountId, string? accountSessionToken, PersistlyRuntimeRecord account, PersistlySyncPolicy? syncPolicy = null)
         {
             AccountId = accountId;
             AccountSessionToken = accountSessionToken;
@@ -189,28 +173,28 @@ namespace Persistly.Unity
 
         public string? AccountSessionToken { get; }
 
-        public PersistlySave Account { get; }
+        public PersistlyRuntimeRecord Account { get; }
 
-        public PersistlySave Save => Account;
+        public PersistlyRuntimeRecord Save => Account;
 
         public PersistlySyncPolicy? SyncPolicy { get; }
 
-        public PersistlyAccountState AccountState => PersistlyAccountState.Parse(Account.StateJson);
+        public PersistlyAccountState AccountState => PersistlyAccountState.Parse(Account.DataJson);
     }
 
     public sealed class PersistlySlotEnvelope
     {
-        public PersistlySlotEnvelope(PersistlySave save)
+        public PersistlySlotEnvelope(PersistlyRuntimeRecord save)
         {
             Save = save;
         }
 
-        public PersistlySave Save { get; }
+        public PersistlyRuntimeRecord Save { get; }
     }
 
     public sealed class PersistlyCreateAccountResponse
     {
-        public PersistlyCreateAccountResponse(string accountId, string? accountSessionToken, PersistlySave account, PersistlySave? slot, PersistlySyncPolicy syncPolicy)
+        public PersistlyCreateAccountResponse(string accountId, string? accountSessionToken, PersistlyRuntimeRecord account, PersistlyRuntimeRecord? slot, PersistlySyncPolicy syncPolicy)
         {
             AccountId = accountId;
             AccountSessionToken = accountSessionToken;
@@ -223,13 +207,13 @@ namespace Persistly.Unity
 
         public string? AccountSessionToken { get; }
 
-        public PersistlySave Account { get; }
+        public PersistlyRuntimeRecord Account { get; }
 
-        public PersistlySave? Slot { get; }
+        public PersistlyRuntimeRecord? Slot { get; }
 
         public PersistlySyncPolicy SyncPolicy { get; }
 
-        public PersistlyAccountState AccountState => PersistlyAccountState.Parse(Account.StateJson);
+        public PersistlyAccountState AccountState => PersistlyAccountState.Parse(Account.DataJson);
     }
 
     public sealed class PersistlyCreateTransferCodeResponse
@@ -293,7 +277,7 @@ namespace Persistly.Unity
             DateTimeOffset deletedAt,
             bool alreadyDeleted,
             bool cleanupQueued,
-            PersistlySave? account = null)
+            PersistlyRuntimeRecord? account = null)
         {
             AccountId = accountId;
             SlotId = slotId;
@@ -313,7 +297,7 @@ namespace Persistly.Unity
 
         public bool CleanupQueued { get; }
 
-        public PersistlySave? Account { get; }
+        public PersistlyRuntimeRecord? Account { get; }
     }
 
     public sealed class PersistlySyncPolicy
@@ -420,7 +404,7 @@ namespace Persistly.Unity
     {
         public PersistlySyncResponse(
             PersistlySyncStatus status,
-            PersistlySave save,
+            PersistlyRuntimeRecord save,
             PersistlySyncConflictDetails? details = null,
             bool historyRetained = false,
             IReadOnlyList<string>? warnings = null)
@@ -434,7 +418,7 @@ namespace Persistly.Unity
 
         public PersistlySyncStatus Status { get; }
 
-        public PersistlySave Save { get; }
+        public PersistlyRuntimeRecord Save { get; }
 
         public PersistlySyncConflictDetails? Details { get; }
 

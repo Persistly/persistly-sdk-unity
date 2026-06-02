@@ -12,7 +12,7 @@ namespace Persistly.Unity
         private readonly Uri _baseUri;
         private readonly string _runtimeKey;
         private readonly IPersistlyTransport _transport;
-        private readonly IPersistlySaveCache _cache;
+        private readonly IPersistlyRuntimeCache _cache;
         private readonly int _timeoutSeconds;
         private readonly string _userAgent;
         private readonly string _sdkName;
@@ -45,7 +45,7 @@ namespace Persistly.Unity
 
             _runtimeKey = options.RuntimeKey.Trim();
             _transport = options.Transport ?? new UnityWebRequestTransport();
-            _cache = options.Cache ?? new InMemoryPersistlySaveCache();
+            _cache = options.Cache ?? new InMemoryPersistlyRuntimeCache();
             _timeoutSeconds = options.TimeoutSeconds;
             _userAgent = options.UserAgent;
             _sdkName = NormalizeDiagnosticsHeader(options.SdkName, "unity");
@@ -55,7 +55,7 @@ namespace Persistly.Unity
             _clientVersion = NormalizeOptionalDiagnosticsHeader(options.ClientVersion);
         }
 
-        public Task UpdateLocalAsync(PersistlySave save)
+        public Task UpdateLocalAsync(PersistlyRuntimeRecord save)
         {
             if (save == null)
             {
@@ -66,45 +66,25 @@ namespace Persistly.Unity
             return Task.CompletedTask;
         }
 
-        public bool TryGetLocal(string saveId, out PersistlySave save)
+        public bool TryGetLocal(string runtimeId, out PersistlyRuntimeRecord save)
         {
-            if (string.IsNullOrWhiteSpace(saveId))
+            if (string.IsNullOrWhiteSpace(runtimeId))
             {
-                throw new PersistlyConfigurationError("saveId must be set.");
+                throw new PersistlyConfigurationError("runtimeId must be set.");
             }
 
-            return _cache.TryGet(saveId, out save);
+            return _cache.TryGet(runtimeId, out save);
         }
 
-        public Task ClearLocalAsync(string saveId)
+        public Task ClearLocalAsync(string runtimeId)
         {
-            if (string.IsNullOrWhiteSpace(saveId))
+            if (string.IsNullOrWhiteSpace(runtimeId))
             {
-                throw new PersistlyConfigurationError("saveId must be set.");
+                throw new PersistlyConfigurationError("runtimeId must be set.");
             }
 
-            _cache.Clear(saveId);
+            _cache.Clear(runtimeId);
             return Task.CompletedTask;
-        }
-
-        public async Task<PersistlySave> CreateSaveAsync(PersistlyCreateSaveRequest request, CancellationToken cancellationToken = default)
-        {
-            if (request == null)
-            {
-                throw new ArgumentNullException(nameof(request));
-            }
-
-            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.StateJson);
-
-            var response = await SendJsonAsync(
-                "POST",
-                "/api/v1/saves",
-                BuildCreateBody(request),
-                cancellationToken);
-
-            var save = ParseSaveEnvelope(response.Body);
-            _cache.Store(save);
-            return save;
         }
 
         public async Task<PersistlyCreateAccountResponse> CreateAccountAsync(PersistlyCreateAccountRequest request, CancellationToken cancellationToken = default)
@@ -138,7 +118,7 @@ namespace Persistly.Unity
 
         public async Task<PersistlyAccountEnvelope> LoadAccountAsync(string accountId, string accountSessionToken, CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
+            EnsureRuntimeId(accountId);
             EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
@@ -160,7 +140,7 @@ namespace Persistly.Unity
             int? ttlSeconds = null,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
+            EnsureRuntimeId(accountId);
             EnsureSessionToken(accountSessionToken);
             if (ttlSeconds.HasValue && ttlSeconds.Value < 1)
             {
@@ -202,7 +182,7 @@ namespace Persistly.Unity
 
         public async Task<PersistlyDeleteAccountResponse> DeleteAccountAsync(string accountId, string accountSessionToken, CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
+            EnsureRuntimeId(accountId);
             EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
@@ -223,14 +203,14 @@ namespace Persistly.Unity
             PersistlyCreateAccountSlotRequest request,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
+            EnsureRuntimeId(accountId);
             EnsureSessionToken(accountSessionToken);
             if (request == null)
             {
                 throw new ArgumentNullException(nameof(request));
             }
 
-            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.SlotDataJson);
+            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.DataJson);
 
             var response = await SendJsonAsync(
                 "POST",
@@ -255,8 +235,8 @@ namespace Persistly.Unity
             string slotId,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
-            EnsureSaveId(slotId);
+            EnsureRuntimeId(accountId);
+            EnsureRuntimeId(slotId);
             EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
@@ -276,10 +256,10 @@ namespace Persistly.Unity
             return archived;
         }
 
-        public async Task<PersistlySave> LoadAccountSlotAsync(string accountId, string accountSessionToken, string slotId, CancellationToken cancellationToken = default)
+        public async Task<PersistlyRuntimeRecord> LoadAccountSlotAsync(string accountId, string accountSessionToken, string slotId, CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
-            EnsureSaveId(slotId);
+            EnsureRuntimeId(accountId);
+            EnsureRuntimeId(slotId);
             EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
@@ -300,8 +280,8 @@ namespace Persistly.Unity
             string slotId,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
-            EnsureSaveId(slotId);
+            EnsureRuntimeId(accountId);
+            EnsureRuntimeId(slotId);
             EnsureSessionToken(accountSessionToken);
 
             var response = await SendJsonAsync(
@@ -325,11 +305,11 @@ namespace Persistly.Unity
             string accountId,
             string accountSessionToken,
             string slotId,
-            PersistlySyncSaveRequest request,
+            PersistlySyncAccountSlotRequest request,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
-            EnsureSaveId(slotId);
+            EnsureRuntimeId(accountId);
+            EnsureRuntimeId(slotId);
             EnsureSessionToken(accountSessionToken);
 
             if (request == null)
@@ -337,10 +317,10 @@ namespace Persistly.Unity
                 throw new ArgumentNullException(nameof(request));
             }
 
-            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.StateJson);
+            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.DataJson);
 
             var baseVersion = request.BaseVersion;
-            PersistlySave cachedSave;
+            PersistlyRuntimeRecord cachedSave;
             if (!baseVersion.HasValue && _cache.TryGet(slotId, out cachedSave))
             {
                 baseVersion = cachedSave.Version;
@@ -361,12 +341,12 @@ namespace Persistly.Unity
 
             if (response.StatusCode == 200)
             {
-                PersistlySave acceptedCachedSave;
+                PersistlyRuntimeRecord acceptedCachedSave;
                 _cache.TryGet(slotId, out acceptedCachedSave);
                 var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
                 var accepted = BuildAcceptedSyncResponse(
                     acceptedPayload,
-                    acceptedPayload.Save ?? SynthesizeSave(slotId, acceptedCachedSave, request.SlotInfoJson, request.StateJson));
+                    acceptedPayload.Save ?? SynthesizeSave(slotId, acceptedCachedSave, request.SlotInfoJson, request.DataJson));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -411,7 +391,7 @@ namespace Persistly.Unity
             PersistlySyncAccountDataRequest request,
             CancellationToken cancellationToken = default)
         {
-            EnsureSaveId(accountId);
+            EnsureRuntimeId(accountId);
             EnsureSessionToken(accountSessionToken);
             if (request == null)
             {
@@ -430,79 +410,12 @@ namespace Persistly.Unity
 
             if (response.StatusCode == 200)
             {
-                PersistlySave cachedSave;
+                PersistlyRuntimeRecord cachedSave;
                 _cache.TryGet(accountId, out cachedSave);
                 var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
                 var accepted = BuildAcceptedSyncResponse(
                     acceptedPayload,
                     acceptedPayload.Save ?? SynthesizeAccountSave(accountId, cachedSave, request));
-                _cache.Store(accepted.Save);
-                return accepted;
-            }
-
-            if (response.StatusCode == 409)
-            {
-                var conflict = ParseConflictSyncResponse(response.Body);
-                _cache.Store(conflict.Save);
-                return conflict;
-            }
-
-            throw ParseApiError(response.StatusCode, response.Body, response.Error);
-        }
-
-        public async Task<PersistlySave> LoadSaveAsync(string saveId, CancellationToken cancellationToken = default)
-        {
-            EnsureSaveId(saveId);
-
-            var response = await SendJsonAsync(
-                "GET",
-                "/api/v1/saves/" + Uri.EscapeDataString(saveId),
-                null,
-                cancellationToken);
-
-            var save = ParseSaveEnvelope(response.Body);
-            _cache.Store(save);
-            return save;
-        }
-
-        public async Task<PersistlySyncResponse> SyncSaveAsync(string saveId, PersistlySyncSaveRequest request, CancellationToken cancellationToken = default)
-        {
-            EnsureSaveId(saveId);
-
-            if (request == null)
-            {
-                throw new ArgumentNullException(nameof(request));
-            }
-
-            PersistlyJson.ValidatePayloadSizes(request.SlotInfoJson, request.StateJson);
-
-            var baseVersion = request.BaseVersion;
-            PersistlySave cachedSave;
-            if (!baseVersion.HasValue && _cache.TryGet(saveId, out cachedSave))
-            {
-                baseVersion = cachedSave.Version;
-            }
-
-            if (!baseVersion.HasValue)
-            {
-                throw new PersistlyConfigurationError("SyncSaveAsync requires baseVersion unless the save is already cached.");
-            }
-
-            var response = await SendJsonAsync(
-                "POST",
-                "/api/v1/saves/" + Uri.EscapeDataString(saveId) + "/sync",
-                BuildSyncBody(request, baseVersion.Value),
-                cancellationToken,
-                acceptConflictStatus: true);
-
-            if (response.StatusCode == 200)
-            {
-                PersistlySave acceptedCachedSave;
-                _cache.TryGet(saveId, out acceptedCachedSave);
-                var acceptedPayload = ParseAcceptedSyncResponse(response.Body);
-                var accepted = BuildAcceptedSyncResponse(
-                    acceptedPayload,
-                    acceptedPayload.Save ?? SynthesizeSave(saveId, acceptedCachedSave, request.SlotInfoJson, request.StateJson));
                 _cache.Store(accepted.Save);
                 return accepted;
             }
@@ -575,25 +488,7 @@ namespace Persistly.Unity
             throw ParseApiError(response.StatusCode, response.Body, response.Error);
         }
 
-        private static string BuildCreateBody(PersistlyCreateSaveRequest request)
-        {
-            var body = "{";
-            if (request.PlayerRef != null)
-            {
-                body += "\"playerRef\":" + PersistlyJson.EscapeJsonString(request.PlayerRef) + ",";
-            }
-
-            if (request.SlotInfoJson != null)
-            {
-                body += "\"slotInfo\":" + request.SlotInfoJson + ",";
-            }
-
-            body += "\"state\":" + request.StateJson;
-            body += "}";
-            return body;
-        }
-
-        private static string BuildSyncBody(PersistlySyncSaveRequest request, int baseVersion)
+        private static string BuildSyncSlotBody(PersistlySyncAccountSlotRequest request, int baseVersion)
         {
             var body = "{";
             body += "\"baseVersion\":" + baseVersion.ToString(CultureInfo.InvariantCulture) + ",";
@@ -602,21 +497,7 @@ namespace Persistly.Unity
                 body += "\"slotInfo\":" + request.SlotInfoJson + ",";
             }
 
-            body += "\"state\":" + request.StateJson;
-            body += "}";
-            return body;
-        }
-
-        private static string BuildSyncSlotBody(PersistlySyncSaveRequest request, int baseVersion)
-        {
-            var body = "{";
-            body += "\"baseVersion\":" + baseVersion.ToString(CultureInfo.InvariantCulture) + ",";
-            if (request.SlotInfoJson != null)
-            {
-                body += "\"slotInfo\":" + request.SlotInfoJson + ",";
-            }
-
-            body += "\"data\":" + request.StateJson;
+            body += "\"data\":" + request.DataJson;
             body += "}";
             return body;
         }
@@ -653,7 +534,7 @@ namespace Persistly.Unity
             return "{" +
                 "\"slotId\":" + PersistlyJson.EscapeJsonString(request.SlotId) + "," +
                 "\"slotInfo\":" + request.SlotInfoJson + "," +
-                "\"data\":" + request.SlotDataJson +
+                "\"data\":" + request.DataJson +
                 "}";
         }
 
@@ -712,20 +593,13 @@ namespace Persistly.Unity
             return body;
         }
 
-        private static PersistlySave ParseSaveEnvelope(string body)
-        {
-            var root = AsObject(PersistlyJson.ParseJsonValue(body, "save envelope"), "save envelope");
-            var save = GetRequiredObject(root, "save", "save envelope");
-            return ParseSave(save);
-        }
-
         private static PersistlyCreateAccountResponse ParseCreateAccountResponse(string body)
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "create account response"), "create account response");
             var accountId = GetRequiredString(root, "accountId", "account envelope");
             var accountSessionToken = GetOptionalString(root, "accountSessionToken");
             var accountRoot = GetRequiredObject(root, "account", "account envelope");
-            PersistlySave? slot = null;
+            PersistlyRuntimeRecord? slot = null;
             if (root.ContainsKey("slot") && root["slot"] != null)
             {
                 slot = ParseSlotObjectAsSave(GetRequiredObject(root, "slot", "account envelope"));
@@ -789,7 +663,7 @@ namespace Persistly.Unity
         private static PersistlyDeleteSlotResponse ParseDeleteSlotResponse(string body)
         {
             var root = AsObject(PersistlyJson.ParseJsonValue(body, "delete account slot response"), "delete account slot response");
-            PersistlySave? account = null;
+            PersistlyRuntimeRecord? account = null;
             Dictionary<string, object?>? accountRoot;
             if (TryGetObject(root, "account", out accountRoot))
             {
@@ -875,7 +749,7 @@ namespace Persistly.Unity
 
         private sealed class AcceptedSyncPayload
         {
-            public AcceptedSyncPayload(PersistlySave? save, int version, DateTimeOffset updatedAt, bool historyRetained, IReadOnlyList<string> warnings)
+            public AcceptedSyncPayload(PersistlyRuntimeRecord? save, int version, DateTimeOffset updatedAt, bool historyRetained, IReadOnlyList<string> warnings)
             {
                 Save = save;
                 Version = version;
@@ -884,7 +758,7 @@ namespace Persistly.Unity
                 Warnings = warnings;
             }
 
-            public PersistlySave? Save { get; }
+            public PersistlyRuntimeRecord? Save { get; }
 
             public int Version { get; }
 
@@ -904,7 +778,7 @@ namespace Persistly.Unity
                 throw new PersistlyConfigurationError("Accepted sync response had an unexpected status.");
             }
 
-            PersistlySave? save = null;
+            PersistlyRuntimeRecord? save = null;
             if (TryGetObject(root, "save", out var saveObject) && saveObject != null)
             {
                 save = ParseSave(saveObject);
@@ -936,15 +810,15 @@ namespace Persistly.Unity
             return new AcceptedSyncPayload(save, version, updatedAt, historyRetained, ParseWarnings(root));
         }
 
-        private static PersistlySyncResponse BuildAcceptedSyncResponse(AcceptedSyncPayload payload, PersistlySave save)
+        private static PersistlySyncResponse BuildAcceptedSyncResponse(AcceptedSyncPayload payload, PersistlyRuntimeRecord save)
         {
             return new PersistlySyncResponse(
                 PersistlySyncStatus.Accepted,
-                new PersistlySave(
-                    save.SaveId,
+                new PersistlyRuntimeRecord(
+                    save.RuntimeId,
                     save.PlayerRef,
                     save.SlotInfoJson,
-                    save.StateJson,
+                    save.DataJson,
                     payload.Version,
                     save.CreatedAt,
                     payload.UpdatedAt),
@@ -952,10 +826,10 @@ namespace Persistly.Unity
                 warnings: payload.Warnings);
         }
 
-        private static PersistlySave SynthesizeSave(string saveId, PersistlySave? cachedSave, string? slotInfoJson, string stateJson)
+        private static PersistlyRuntimeRecord SynthesizeSave(string runtimeId, PersistlyRuntimeRecord? cachedSave, string? slotInfoJson, string stateJson)
         {
-            return new PersistlySave(
-                saveId,
+            return new PersistlyRuntimeRecord(
+                runtimeId,
                 cachedSave?.PlayerRef,
                 slotInfoJson ?? cachedSave?.SlotInfoJson ?? "{}",
                 stateJson,
@@ -964,14 +838,14 @@ namespace Persistly.Unity
                 DateTimeOffset.FromUnixTimeSeconds(0));
         }
 
-        private static PersistlySave SynthesizeAccountSave(
+        private static PersistlyRuntimeRecord SynthesizeAccountSave(
             string accountId,
-            PersistlySave? cachedSave,
+            PersistlyRuntimeRecord? cachedSave,
             PersistlySyncAccountDataRequest request)
         {
             var cachedState = cachedSave == null
                 ? new Dictionary<string, object?>()
-                : AsObject(PersistlyJson.ParseJsonValue(cachedSave.StateJson, "cached account state"), "cached account state");
+                : AsObject(PersistlyJson.ParseJsonValue(cachedSave.DataJson, "cached account state"), "cached account state");
             var accountData = request.AccountDataJson != null
                 ? AsObject(PersistlyJson.ParseJsonValue(request.AccountDataJson, "accountData"), "accountData")
                 : MergeObjects(
@@ -991,7 +865,7 @@ namespace Persistly.Unity
                 ["slots"] = slots,
             });
 
-            return new PersistlySave(
+            return new PersistlyRuntimeRecord(
                 accountId,
                 cachedSave?.PlayerRef,
                 cachedSave?.SlotInfoJson ?? "{}",
@@ -1073,9 +947,9 @@ namespace Persistly.Unity
                 new PersistlySyncConflictDetails(PersistlySyncConflictReason.BaseVersionMismatch));
         }
 
-        private static PersistlySave ParseSave(Dictionary<string, object?> saveObject)
+        private static PersistlyRuntimeRecord ParseSave(Dictionary<string, object?> saveObject)
         {
-            var saveId = GetRequiredString(saveObject, "saveId", "save");
+            var runtimeId = GetRequiredString(saveObject, "runtimeId", "save");
             var playerRef = GetOptionalString(saveObject, "playerRef");
             var slotInfo = saveObject.ContainsKey("slotInfo")
                 ? GetRequiredObject(saveObject, "slotInfo", "save")
@@ -1087,8 +961,8 @@ namespace Persistly.Unity
             var createdAt = GetRequiredDateTimeOffset(saveObject, "createdAt", "save");
             var updatedAt = GetRequiredDateTimeOffset(saveObject, "updatedAt", "save");
 
-            return new PersistlySave(
-                saveId,
+            return new PersistlyRuntimeRecord(
+                runtimeId,
                 playerRef,
                 PersistlyJson.Serialize(slotInfo),
                 PersistlyJson.Serialize(state),
@@ -1097,12 +971,12 @@ namespace Persistly.Unity
                 updatedAt);
         }
 
-        private static PersistlySave ParseAccountObjectAsSave(Dictionary<string, object?> accountObject)
+        private static PersistlyRuntimeRecord ParseAccountObjectAsSave(Dictionary<string, object?> accountObject)
         {
-            return accountObject.ContainsKey("saveId") ? ParseSave(accountObject) : ParseAccountAsSave(accountObject);
+            return accountObject.ContainsKey("runtimeId") ? ParseSave(accountObject) : ParseAccountAsSave(accountObject);
         }
 
-        private static PersistlySave ParseAccountAsSave(Dictionary<string, object?> accountObject)
+        private static PersistlyRuntimeRecord ParseAccountAsSave(Dictionary<string, object?> accountObject)
         {
             var accountId = GetRequiredString(accountObject, "accountId", "account");
             var accountData = GetRequiredObject(accountObject, "accountData", "account");
@@ -1120,15 +994,15 @@ namespace Persistly.Unity
                 ? GetRequiredDateTimeOffset(accountObject, "updatedAt", "account")
                 : DateTimeOffset.FromUnixTimeSeconds(0);
 
-            return new PersistlySave(accountId, GetOptionalString(accountObject, "playerRef"), "{}", PersistlyJson.Serialize(state), version, updatedAt, updatedAt);
+            return new PersistlyRuntimeRecord(accountId, GetOptionalString(accountObject, "playerRef"), "{}", PersistlyJson.Serialize(state), version, updatedAt, updatedAt);
         }
 
-        private static PersistlySave ParseSlotObjectAsSave(Dictionary<string, object?> slotObject)
+        private static PersistlyRuntimeRecord ParseSlotObjectAsSave(Dictionary<string, object?> slotObject)
         {
-            return slotObject.ContainsKey("saveId") ? ParseSave(slotObject) : ParseSlotAsSave(slotObject);
+            return slotObject.ContainsKey("runtimeId") ? ParseSave(slotObject) : ParseSlotAsSave(slotObject);
         }
 
-        private static PersistlySave ParseSlotAsSave(Dictionary<string, object?> slotObject)
+        private static PersistlyRuntimeRecord ParseSlotAsSave(Dictionary<string, object?> slotObject)
         {
             var slotId = GetRequiredString(slotObject, "slotId", "slot");
             var slotInfo = GetRequiredObject(slotObject, "slotInfo", "slot");
@@ -1138,7 +1012,7 @@ namespace Persistly.Unity
                 ? GetRequiredDateTimeOffset(slotObject, "updatedAt", "slot")
                 : DateTimeOffset.FromUnixTimeSeconds(0);
 
-            return new PersistlySave(slotId, null, PersistlyJson.Serialize(slotInfo), PersistlyJson.Serialize(data), version, updatedAt, updatedAt);
+            return new PersistlyRuntimeRecord(slotId, null, PersistlyJson.Serialize(slotInfo), PersistlyJson.Serialize(data), version, updatedAt, updatedAt);
         }
 
         private static PersistlyApiError ParseApiError(int statusCode, string body, string? transportError)
@@ -1434,11 +1308,11 @@ namespace Persistly.Unity
             }
         }
 
-        private static void EnsureSaveId(string saveId)
+        private static void EnsureRuntimeId(string runtimeId)
         {
-            if (string.IsNullOrWhiteSpace(saveId))
+            if (string.IsNullOrWhiteSpace(runtimeId))
             {
-                throw new PersistlyConfigurationError("saveId must be set.");
+                throw new PersistlyConfigurationError("runtimeId must be set.");
             }
         }
 

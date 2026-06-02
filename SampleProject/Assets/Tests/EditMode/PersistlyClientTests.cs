@@ -23,13 +23,13 @@ namespace Persistly.Unity.LastBeacon.Tests
 
             Assert.That(result.AccountId, Is.EqualTo("acc_account"));
             Assert.That(result.AccountSessionToken, Is.EqualTo("pst_account_session"));
-            Assert.That(result.Account.StateJson, Does.Contain("\"slots\":[]"));
+            Assert.That(result.Account.DataJson, Does.Contain("\"slots\":[]"));
             Assert.That(result.Slot, Is.Null);
             Assert.That(result.SyncPolicy.MinRemoteSyncIntervalSeconds, Is.EqualTo(60));
             Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"slot\""));
             Assert.That(transport.LastRequest.Body, Does.Contain("\"externalAccountRef\""));
             Assert.That(client.TryGetLocal("acc_account", out var cachedAccount), Is.True);
-            Assert.That(cachedAccount.StateJson, Does.Contain("\"diamonds\":20"));
+            Assert.That(cachedAccount.DataJson, Does.Contain("\"diamonds\":20"));
         }
 
         [Test]
@@ -49,11 +49,33 @@ namespace Persistly.Unity.LastBeacon.Tests
                 playerRef: "player-184"));
 
             Assert.That(result.Slot, Is.Not.Null);
-            Assert.That(result.Slot.SaveId, Is.EqualTo("autosave"));
+            Assert.That(result.Slot.RuntimeId, Is.EqualTo("autosave"));
             Assert.That(transport.LastRequest.Body, Does.Contain("\"slot\""));
             Assert.That(transport.LastRequest.Body, Does.Contain("\"slotInfo\""));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"data\""));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"metadata\""));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"state\""));
             Assert.That(client.TryGetLocal("autosave", out var cachedSlot), Is.True);
-            Assert.That(cachedSlot.StateJson, Does.Contain("\"level\":1"));
+            Assert.That(cachedSlot.DataJson, Does.Contain("\"level\":1"));
+        }
+
+        [Test]
+        public async Task CreateAccountSlotSendsSlotInfoAndData()
+        {
+            var transport = new RecordingTransport(
+                201,
+                "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_account_session\",\"account\":{\"accountId\":\"acc_account\",\"accountData\":{},\"slots\":[{\"slotId\":\"autosave\",\"slotInfo\":{\"name\":\"Ayla\"},\"version\":1,\"updatedAt\":\"2026-04-10T00:00:00Z\"}],\"version\":1,\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"slot\":{\"slotId\":\"autosave\",\"slotInfo\":{\"name\":\"Ayla\"},\"data\":{\"level\":1},\"version\":1,\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":10,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}");
+            var client = BuildClient(transport);
+
+            await client.CreateAccountSlotAsync(
+                "acc_account",
+                "pst_account_session",
+                new PersistlyCreateAccountSlotRequest("autosave", "{\"name\":\"Ayla\"}", "{\"level\":1}"));
+
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"slotInfo\":{\"name\":\"Ayla\"}"));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"data\":{\"level\":1}"));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"metadata\""));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"state\""));
         }
 
         [Test]
@@ -66,7 +88,7 @@ namespace Persistly.Unity.LastBeacon.Tests
 
             var loaded = await client.LoadAccountSlotAsync("acc_account", "pst_account_session", "autosave");
 
-            Assert.That(loaded.SaveId, Is.EqualTo("autosave"));
+            Assert.That(loaded.RuntimeId, Is.EqualTo("autosave"));
             Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/slots/autosave"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_account_session"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-SDK"], Is.EqualTo("unity"));
@@ -111,7 +133,7 @@ namespace Persistly.Unity.LastBeacon.Tests
 
             Assert.That(result.AccountId, Is.EqualTo("acc_account"));
             Assert.That(result.AccountSessionToken, Is.EqualTo("pst_new_session"));
-            Assert.That(result.Account.StateJson, Does.Contain("\"diamonds\":20"));
+            Assert.That(result.Account.DataJson, Does.Contain("\"diamonds\":20"));
             Assert.That(transport.LastRequest.Method, Is.EqualTo("POST"));
             Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/account-transfer-codes/consume"));
             Assert.That(transport.LastRequest.Headers.ContainsKey("X-Persistly-Account-Session"), Is.False);
@@ -136,7 +158,7 @@ namespace Persistly.Unity.LastBeacon.Tests
                 new PersistlySyncAccountDataRequest(1, accountDataPatchJson: "{\"diamonds\":30}"));
 
             Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Accepted));
-            Assert.That(result.Save.SaveId, Is.EqualTo("acc_account"));
+            Assert.That(result.Save.RuntimeId, Is.EqualTo("acc_account"));
             Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/data/sync"));
             Assert.That(transport.LastRequest.Body, Does.Contain("\"accountDataPatch\":{\"diamonds\":30}"));
             Assert.That(client.TryGetLocal("acc_account", out var cached), Is.True);
@@ -146,8 +168,8 @@ namespace Persistly.Unity.LastBeacon.Tests
         [Test]
         public async Task LightweightAccountAccountDataPatchDeletesNullKeysInSynthesizedCache()
         {
-            var cache = new InMemoryPersistlySaveCache();
-            cache.Store(new PersistlySave(
+            var cache = new InMemoryPersistlyRuntimeCache();
+            cache.Store(new PersistlyRuntimeRecord(
                 "acc_account",
                 "player-184",
                 "{}",
@@ -170,10 +192,10 @@ namespace Persistly.Unity.LastBeacon.Tests
                 new PersistlySyncAccountDataRequest(1, accountDataPatchJson: "{\"diamonds\":30,\"oldKey\":null}"));
 
             Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Accepted));
-            Assert.That(result.Save.StateJson, Does.Contain("\"diamonds\":30"));
-            Assert.That(result.Save.StateJson, Does.Not.Contain("oldKey"));
+            Assert.That(result.Save.DataJson, Does.Contain("\"diamonds\":30"));
+            Assert.That(result.Save.DataJson, Does.Not.Contain("oldKey"));
             Assert.That(client.TryGetLocal("acc_account", out var cached), Is.True);
-            Assert.That(cached.StateJson, Does.Not.Contain("oldKey"));
+            Assert.That(cached.DataJson, Does.Not.Contain("oldKey"));
         }
 
         [Test]
@@ -187,7 +209,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             var result = await client.ArchiveSlotAsync("acc_account", "pst_account_session", "autosave");
 
             Assert.That(result.AccountId, Is.EqualTo("acc_account"));
-            Assert.That(result.Account.StateJson, Does.Contain("\"archived\":true"));
+            Assert.That(result.Account.DataJson, Does.Contain("\"archived\":true"));
             Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/slots/autosave/archive"));
             Assert.That(client.TryGetLocal("acc_account", out var cached), Is.True);
             Assert.That(cached.Version, Is.EqualTo(3));
@@ -196,8 +218,8 @@ namespace Persistly.Unity.LastBeacon.Tests
         [Test]
         public async Task DeleteAccountSlotUsesDeleteRouteClearsSlotCacheAndUpdatesAccountCache()
         {
-            var cache = new InMemoryPersistlySaveCache();
-            cache.Store(new PersistlySave(
+            var cache = new InMemoryPersistlyRuntimeCache();
+            cache.Store(new PersistlyRuntimeRecord(
                 "autosave",
                 "player-184",
                 "{}",
@@ -227,8 +249,8 @@ namespace Persistly.Unity.LastBeacon.Tests
         [Test]
         public async Task DeleteAccountUsesDeleteRouteAndClearsAccountCache()
         {
-            var cache = new InMemoryPersistlySaveCache();
-            cache.Store(new PersistlySave(
+            var cache = new InMemoryPersistlyRuntimeCache();
+            cache.Store(new PersistlyRuntimeRecord(
                 "acc_account",
                 "player-184",
                 "{}",
@@ -257,17 +279,21 @@ namespace Persistly.Unity.LastBeacon.Tests
         [Test]
         public async Task SyncAccountSlotReturnsConflictAndCachesCanonicalSave()
         {
-            var transport = new StubTransport(
+            var transport = new RecordingTransport(
                 409,
                 "{\"status\":\"conflict\",\"slot\":{\"slotId\":\"autosave\",\"slotInfo\":{\"slot\":1},\"data\":{\"level\":3},\"version\":7,\"updatedAt\":\"2026-04-10T00:08:00Z\"},\"details\":{\"reason\":\"base_version_mismatch\"}}");
             var client = BuildClient(transport);
 
-            var result = await client.SyncAccountSlotAsync("acc_account", "pst_account_session", "autosave", new PersistlySyncSaveRequest("{\"level\":2}", 6, "{\"slot\":1}"));
+            var result = await client.SyncAccountSlotAsync("acc_account", "pst_account_session", "autosave", new PersistlySyncAccountSlotRequest("{\"level\":2}", 6, "{\"slot\":1}"));
 
             Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Conflict));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"slotInfo\":{\"slot\":1}"));
+            Assert.That(transport.LastRequest.Body, Does.Contain("\"data\":{\"level\":2}"));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"metadata\""));
+            Assert.That(transport.LastRequest.Body, Does.Not.Contain("\"state\""));
             Assert.That(result.Save.Version, Is.EqualTo(7));
             Assert.That(client.TryGetLocal("autosave", out var cached), Is.True);
-            Assert.That(cached.StateJson, Does.Contain("\"level\":3"));
+            Assert.That(cached.DataJson, Does.Contain("\"level\":3"));
         }
 
         [Test]
@@ -338,7 +364,7 @@ namespace Persistly.Unity.LastBeacon.Tests
 
             await manager.RecordLocalChangeAsync("acc_account", "pst_account_session", "autosave", "{\"slot\":1}", "{\"level\":2}");
             Assert.That(store.TryLoad("autosave", out var draft), Is.True);
-            Assert.That(draft.StateJson, Does.Contain("\"level\":2"));
+            Assert.That(draft.DataJson, Does.Contain("\"level\":2"));
 
             var first = await manager.ForceSyncAsync("autosave");
             var second = await manager.ForceSyncAsync("autosave");
@@ -346,38 +372,6 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(first.SyncedRemotely, Is.True);
             Assert.That(second.SkippedReason, Is.EqualTo(PersistlyAutosaveSkippedReason.ForceSyncCooldown));
             Assert.That(syncCount, Is.EqualTo(1));
-        }
-
-        [Test]
-        public async Task CreateSaveStoresCanonicalPayloadInCache()
-        {
-            var transport = new StubTransport(201, "{\"save\":{\"saveId\":\"sv_01\",\"playerRef\":\"player-184\",\"slotInfo\":{\"slotName\":\"Ayla\"},\"state\":{\"Scrap\":12,\"Workers\":1},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"}}");
-            var client = BuildClient(transport);
-
-            var created = await client.CreateSaveAsync(new PersistlyCreateSaveRequest("{\"Scrap\":12,\"Workers\":1}", "{\"slotName\":\"Ayla\"}", "player-184"));
-
-            Assert.That(created.SaveId, Is.EqualTo("sv_01"));
-            Assert.That(created.Version, Is.EqualTo(1));
-            Assert.That(created.SlotInfoJson, Does.Contain("Ayla"));
-            Assert.That(client.TryGetLocal("sv_01", out var cached), Is.True);
-            Assert.That(cached.StateJson, Does.Contain("\"Scrap\":12"));
-        }
-
-        [Test]
-        public async Task ConflictSyncReturnsCanonicalRemoteSave()
-        {
-            var transport = new StubTransport(
-                409,
-                "{\"status\":\"conflict\",\"save\":{\"saveId\":\"sv_01\",\"playerRef\":\"player-184\",\"slotInfo\":{\"slotName\":\"Ayla\"},\"state\":{\"Scrap\":77,\"Workers\":3},\"version\":5,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:05:00Z\"},\"details\":{\"reason\":\"base_version_mismatch\"}}");
-            var client = BuildClient(transport);
-
-            var result = await client.SyncSaveAsync("sv_01", new PersistlySyncSaveRequest("{\"Scrap\":14}", 4, "{\"slotName\":\"Ayla\"}"));
-
-            Assert.That(result.Status, Is.EqualTo(PersistlySyncStatus.Conflict));
-            Assert.That(result.Save.Version, Is.EqualTo(5));
-            Assert.That(result.Save.StateJson, Does.Contain("\"Scrap\":77"));
-            Assert.That(client.TryGetLocal("sv_01", out var cached), Is.True);
-            Assert.That(cached.Version, Is.EqualTo(5));
         }
 
         private static PersistlyClient BuildClient(IPersistlyTransport transport)

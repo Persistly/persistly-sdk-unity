@@ -5,7 +5,7 @@ namespace Persistly.Unity.LastBeacon.Tests
     public sealed class LastBeaconStoreTests
     {
         [Test]
-        public void AccountRoundTripPreservesConfigAndSaveIdentity()
+        public void AccountRoundTripPreservesConfigAndRuntimeIdentity()
         {
             const string path = "last_beacon_store_test.json";
             var store = new LastBeaconAccountStore(path);

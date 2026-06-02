@@ -105,7 +105,7 @@ namespace Persistly.Unity
             SlotInfoJson = inspection?.SlotInfoJson;
             Dirty = inspection?.Dirty ?? false;
             Version = inspection?.Version;
-            CloudStateJson = inspection?.CloudStateJson;
+            CloudDataJson = inspection?.CloudDataJson;
             CloudSlotInfoJson = inspection?.CloudSlotInfoJson;
             CloudVersion = inspection?.CloudVersion;
             Archived = inspection?.Archived ?? false;
@@ -123,7 +123,7 @@ namespace Persistly.Unity
 
         public int? Version { get; }
 
-        public string? CloudStateJson { get; }
+        public string? CloudDataJson { get; }
 
         public string? CloudSlotInfoJson { get; }
 
@@ -141,22 +141,22 @@ namespace Persistly.Unity
         public PersistlyGameSaveConflict(
             PersistlyGameSaveTarget target,
             string? slotId,
-            string? localStateJson,
+            string? localDataJson,
             string? localSlotInfoJson,
             int? localVersion,
             DateTimeOffset? localUpdatedAt,
-            string? cloudStateJson,
+            string? cloudDataJson,
             string? cloudSlotInfoJson,
             int? cloudVersion,
             DateTimeOffset? cloudUpdatedAt)
         {
             Target = target;
             SlotId = slotId;
-            LocalStateJson = localStateJson;
+            LocalDataJson = localDataJson;
             LocalSlotInfoJson = localSlotInfoJson;
             LocalVersion = localVersion;
             LocalUpdatedAt = localUpdatedAt;
-            CloudStateJson = cloudStateJson;
+            CloudDataJson = cloudDataJson;
             CloudSlotInfoJson = cloudSlotInfoJson;
             CloudVersion = cloudVersion;
             CloudUpdatedAt = cloudUpdatedAt;
@@ -166,7 +166,7 @@ namespace Persistly.Unity
 
         public string? SlotId { get; }
 
-        public string? LocalStateJson { get; }
+        public string? LocalDataJson { get; }
 
         public string? LocalSlotInfoJson { get; }
 
@@ -174,7 +174,7 @@ namespace Persistly.Unity
 
         public DateTimeOffset? LocalUpdatedAt { get; }
 
-        public string? CloudStateJson { get; }
+        public string? CloudDataJson { get; }
 
         public string? CloudSlotInfoJson { get; }
 
@@ -271,7 +271,7 @@ namespace Persistly.Unity
             string? slotInfoJson,
             bool dirty,
             int? version,
-            string? cloudStateJson,
+            string? cloudDataJson,
             string? cloudSlotInfoJson,
             int? cloudVersion,
             bool archived,
@@ -280,11 +280,11 @@ namespace Persistly.Unity
         {
             SlotId = slotId;
             Exists = exists;
-            StateJson = stateJson;
+            DataJson = stateJson;
             SlotInfoJson = slotInfoJson;
             Dirty = dirty;
             Version = version;
-            CloudStateJson = cloudStateJson;
+            CloudDataJson = cloudDataJson;
             CloudSlotInfoJson = cloudSlotInfoJson;
             CloudVersion = cloudVersion;
             Archived = archived;
@@ -296,7 +296,7 @@ namespace Persistly.Unity
 
         public bool Exists { get; }
 
-        public string? StateJson { get; }
+        public string? DataJson { get; }
 
         public string? SlotInfoJson { get; }
 
@@ -304,7 +304,7 @@ namespace Persistly.Unity
 
         public int? Version { get; }
 
-        public string? CloudStateJson { get; }
+        public string? CloudDataJson { get; }
 
         public string? CloudSlotInfoJson { get; }
 
@@ -773,7 +773,7 @@ namespace Persistly.Unity
                 var response = await _client.SyncAccountDataAsync(_account.AccountId!, _account.AccountSessionToken!, request, cancellationToken);
                 if (response.Status == PersistlySyncStatus.Conflict)
                 {
-                    var cloudAccountDataJson = ExtractAccountData(response.Save.StateJson);
+                    var cloudAccountDataJson = ExtractAccountData(response.Save.DataJson);
                     var conflict = BuildAccountConflict(response.Save, cloudAccountDataJson);
                     _account.CloudAccountDataJson = cloudAccountDataJson;
                     _account.CloudVersion = response.Save.Version;
@@ -862,7 +862,7 @@ namespace Persistly.Unity
                 if (slot.Archived)
                 {
                     slot.Version = null;
-                    slot.CloudStateJson = null;
+                    slot.CloudDataJson = null;
                     slot.CloudSlotInfoJson = null;
                     slot.CloudVersion = null;
                     slot.RemoteSlotKnown = false;
@@ -870,7 +870,7 @@ namespace Persistly.Unity
                     slot.LastRemoteSyncAt = null;
                 }
 
-                slot.StateJson = json;
+                slot.DataJson = json;
                 slot.SlotInfoJson = slotInfo;
                 slot.Dirty = true;
                 slot.Archived = false;
@@ -891,7 +891,7 @@ namespace Persistly.Unity
                     return Task.FromResult(new PersistlySlotResult<TState>(normalizedSlotId, PersistlySlotStatus.NotFound, null, false));
                 }
 
-                var state = JsonUtility.FromJson<TState>(slot.StateJson);
+                var state = JsonUtility.FromJson<TState>(slot.DataJson);
                 return Task.FromResult(new PersistlySlotResult<TState>(normalizedSlotId, PersistlySlotStatus.LocalFound, state, true, ToInspection(slot)));
             }
         }
@@ -964,7 +964,7 @@ namespace Persistly.Unity
                     if (slot.Dirty)
                     {
                         var conflict = BuildSlotConflict(slot, remoteSave);
-                        slot.CloudStateJson = remoteSave.StateJson;
+                        slot.CloudDataJson = remoteSave.DataJson;
                         slot.CloudSlotInfoJson = remoteSave.SlotInfoJson;
                         slot.CloudVersion = remoteSave.Version;
                         slot.LastRemoteSyncAt = DateTimeOffset.UtcNow;
@@ -1025,7 +1025,7 @@ namespace Persistly.Unity
                         _account.AccountDataJson,
                         playerRef: Settings.PlayerRef,
                         externalAccountRefJson: Settings.ExternalAccountRefJson,
-                        slot: new PersistlyCreateAccountInitialSlotRequest(slot.SlotId, slot.SlotInfoJson, slot.StateJson)), cancellationToken);
+                        slot: new PersistlyCreateAccountInitialSlotRequest(slot.SlotId, slot.SlotInfoJson, slot.DataJson)), cancellationToken);
                     ApplyAccountResponse(created, false);
                     ApplySyncedSlot(slot, created.Slot!);
                     SaveSlot(slot);
@@ -1052,7 +1052,7 @@ namespace Persistly.Unity
                         var created = await _client.CreateAccountSlotAsync(
                             _account.AccountId!,
                             _account.AccountSessionToken!,
-                            new PersistlyCreateAccountSlotRequest(slot.SlotId, slot.SlotInfoJson, slot.StateJson),
+                            new PersistlyCreateAccountSlotRequest(slot.SlotId, slot.SlotInfoJson, slot.DataJson),
                             cancellationToken);
                         ApplyAccountResponse(created, false);
                         ApplySyncedSlot(slot, created.Slot!);
@@ -1075,13 +1075,13 @@ namespace Persistly.Unity
                     _account.AccountId!,
                     _account.AccountSessionToken!,
                     slot.SlotId,
-                    new PersistlySyncSaveRequest(slot.StateJson, slot.Version, BuildRemoteSlotSlotInfoJson(slot)),
+                    new PersistlySyncAccountSlotRequest(slot.DataJson, slot.Version, BuildRemoteSlotSlotInfoJson(slot)),
                     cancellationToken);
                 slot.LastForceSyncAt = DateTimeOffset.UtcNow;
                 if (response.Status == PersistlySyncStatus.Conflict)
                 {
                     var conflict = BuildSlotConflict(slot, response.Save);
-                    slot.CloudStateJson = response.Save.StateJson;
+                    slot.CloudDataJson = response.Save.DataJson;
                     slot.CloudSlotInfoJson = response.Save.SlotInfoJson;
                     slot.CloudVersion = response.Save.Version;
                     slot.LastRemoteSyncAt = slot.LastForceSyncAt;
@@ -1289,12 +1289,12 @@ namespace Persistly.Unity
             var normalizedSlotId = PersistlySlotId.Normalize(slotId);
             lock (_gate)
             {
-                if (!_slots.TryGetValue(normalizedSlotId, out var slot) || slot.CloudStateJson == null)
+                if (!_slots.TryGetValue(normalizedSlotId, out var slot) || slot.CloudDataJson == null)
                 {
                     return Task.FromResult(new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.NotFound));
                 }
 
-                slot.StateJson = slot.CloudStateJson;
+                slot.DataJson = slot.CloudDataJson;
                 slot.SlotInfoJson = slot.CloudSlotInfoJson == null ? slot.SlotInfoJson : NormalizeSlotInfoJson(slot.CloudSlotInfoJson);
                 slot.Version = slot.CloudVersion;
                 slot.Dirty = false;
@@ -1407,10 +1407,10 @@ namespace Persistly.Unity
             }
         }
 
-        private void ApplyAccountSave(PersistlySave save, bool dirty)
+        private void ApplyAccountSave(PersistlyRuntimeRecord save, bool dirty)
         {
-            var accountState = PersistlyAccountState.Parse(save.StateJson);
-            _account.AccountId = save.SaveId;
+            var accountState = PersistlyAccountState.Parse(save.DataJson);
+            _account.AccountId = save.RuntimeId;
             _account.Version = save.Version;
             _account.AccountDataJson = accountState.AccountDataJson;
             _account.SlotInfoJson = save.SlotInfoJson;
@@ -1420,9 +1420,9 @@ namespace Persistly.Unity
             ApplySlotRefs(accountState.Slots);
         }
 
-        private static string ExtractAccountData(string accountStateJson)
+        private static string ExtractAccountData(string accountDataJson)
         {
-            return PersistlyAccountState.Parse(accountStateJson).AccountDataJson;
+            return PersistlyAccountState.Parse(accountDataJson).AccountDataJson;
         }
 
         private async Task ReconcileExistingRemoteSlotAsync(string slotId, CancellationToken cancellationToken, bool restoreAccount = true)
@@ -1527,11 +1527,11 @@ namespace Persistly.Unity
             }
         }
 
-        private static void ApplyRemoteSlotSnapshot(LocalSlotRecord slot, PersistlySave save)
+        private static void ApplyRemoteSlotSnapshot(LocalSlotRecord slot, PersistlyRuntimeRecord save)
         {
-            slot.SlotId = save.SaveId;
+            slot.SlotId = save.RuntimeId;
             slot.Version = save.Version;
-            slot.CloudStateJson = save.StateJson;
+            slot.CloudDataJson = save.DataJson;
             slot.CloudSlotInfoJson = save.SlotInfoJson;
             slot.CloudVersion = save.Version;
             slot.RemoteSlotKnown = true;
@@ -1543,13 +1543,13 @@ namespace Persistly.Unity
             }
         }
 
-        private void ApplySyncedSlot(LocalSlotRecord slot, PersistlySave save)
+        private void ApplySyncedSlot(LocalSlotRecord slot, PersistlyRuntimeRecord save)
         {
-            slot.SlotId = save.SaveId;
-            slot.StateJson = save.StateJson;
+            slot.SlotId = save.RuntimeId;
+            slot.DataJson = save.DataJson;
             slot.SlotInfoJson = NormalizeSlotInfoJson(save.SlotInfoJson);
             slot.Version = save.Version;
-            slot.CloudStateJson = save.StateJson;
+            slot.CloudDataJson = save.DataJson;
             slot.CloudSlotInfoJson = save.SlotInfoJson;
             slot.CloudVersion = save.Version;
             slot.RemoteSlotKnown = true;
@@ -1576,22 +1576,22 @@ namespace Persistly.Unity
             return PersistlySlotId.BuildSlotInfoJson(slot.SlotId, slot.SlotInfoJson);
         }
 
-        private PersistlyGameSaveConflict BuildSlotConflict(LocalSlotRecord slot, PersistlySave cloudSave)
+        private PersistlyGameSaveConflict BuildSlotConflict(LocalSlotRecord slot, PersistlyRuntimeRecord cloudSave)
         {
             return new PersistlyGameSaveConflict(
                 PersistlyGameSaveTarget.Slot,
                 slot.SlotId,
-                slot.StateJson,
+                slot.DataJson,
                 slot.SlotInfoJson,
                 slot.Version,
                 slot.UpdatedAt,
-                cloudSave.StateJson,
+                cloudSave.DataJson,
                 cloudSave.SlotInfoJson,
                 cloudSave.Version,
                 cloudSave.UpdatedAt);
         }
 
-        private PersistlyGameSaveConflict BuildAccountConflict(PersistlySave cloudSave, string cloudAccountDataJson)
+        private PersistlyGameSaveConflict BuildAccountConflict(PersistlyRuntimeRecord cloudSave, string cloudAccountDataJson)
         {
             return new PersistlyGameSaveConflict(
                 PersistlyGameSaveTarget.Account,
@@ -1621,11 +1621,11 @@ namespace Persistly.Unity
             return new PersistlySlotInspection(
                 slot.SlotId,
                 true,
-                slot.StateJson,
+                slot.DataJson,
                 slot.SlotInfoJson,
                 slot.Dirty,
                 slot.Version,
-                slot.CloudStateJson,
+                slot.CloudDataJson,
                 slot.CloudSlotInfoJson,
                 slot.CloudVersion,
                 slot.Archived,
@@ -1858,13 +1858,13 @@ namespace Persistly.Unity
             }
 
             public string SlotId;
-            public string StateJson = "{}";
+            public string DataJson = "{}";
             public string SlotInfoJson = "{}";
             public bool Dirty;
             public bool Archived;
             public bool RemoteSlotKnown;
             public int? Version;
-            public string? CloudStateJson;
+            public string? CloudDataJson;
             public string? CloudSlotInfoJson;
             public int? CloudVersion;
             public DateTimeOffset? UpdatedAt;
@@ -1877,13 +1877,13 @@ namespace Persistly.Unity
                 {
                     { "schema", SlotSchema },
                     { "slotId", SlotId },
-                    { "state", PersistlyJson.ParseJsonValue(StateJson, "state") },
+                    { "state", PersistlyJson.ParseJsonValue(DataJson, "state") },
                     { "slotInfo", PersistlyJson.ParseJsonValue(SlotInfoJson, "slotInfo") },
                     { "dirty", Dirty },
                     { "archived", Archived },
                     { "remoteSlotKnown", RemoteSlotKnown },
                     { "version", Version },
-                    { "cloudState", CloudStateJson == null ? null : PersistlyJson.ParseJsonValue(CloudStateJson, "cloudState") },
+                    { "cloudState", CloudDataJson == null ? null : PersistlyJson.ParseJsonValue(CloudDataJson, "cloudState") },
                     { "cloudSlotInfo", CloudSlotInfoJson == null ? null : PersistlyJson.ParseJsonValue(CloudSlotInfoJson, "cloudSlotInfo") },
                     { "cloudVersion", CloudVersion },
                     { "updatedAt", FormatDate(UpdatedAt) },
@@ -1909,13 +1909,13 @@ namespace Persistly.Unity
 
                 return new LocalSlotRecord(PersistlySlotId.Normalize(ReadString(root, "slotId") ?? ""))
                 {
-                    StateJson = SerializeObject(root, "state", "{}"),
+                    DataJson = SerializeObject(root, "state", "{}"),
                     SlotInfoJson = SerializeObject(root, "slotInfo", "{}"),
                     Dirty = ReadBool(root, "dirty"),
                     Archived = ReadBool(root, "archived"),
                     RemoteSlotKnown = ReadBool(root, "remoteSlotKnown"),
                     Version = ReadInt(root, "version"),
-                    CloudStateJson = SerializeNullableObject(root, "cloudState"),
+                    CloudDataJson = SerializeNullableObject(root, "cloudState"),
                     CloudSlotInfoJson = SerializeNullableObject(root, "cloudSlotInfo"),
                     CloudVersion = ReadInt(root, "cloudVersion"),
                     UpdatedAt = ReadDate(root, "updatedAt"),

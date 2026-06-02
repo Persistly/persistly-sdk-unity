@@ -8,29 +8,29 @@ using System.Threading.Tasks;
 
 namespace Persistly.Unity
 {
-    public interface IPersistlySaveCache
+    public interface IPersistlyRuntimeCache
     {
-        bool TryGet(string saveId, out PersistlySave save);
+        bool TryGet(string runtimeId, out PersistlyRuntimeRecord save);
 
-        void Store(PersistlySave save);
+        void Store(PersistlyRuntimeRecord save);
 
-        void Clear(string saveId);
+        void Clear(string runtimeId);
     }
 
-    public sealed class InMemoryPersistlySaveCache : IPersistlySaveCache
+    public sealed class InMemoryPersistlyRuntimeCache : IPersistlyRuntimeCache
     {
-        private readonly Dictionary<string, PersistlySave> _saves = new Dictionary<string, PersistlySave>(StringComparer.Ordinal);
+        private readonly Dictionary<string, PersistlyRuntimeRecord> _saves = new Dictionary<string, PersistlyRuntimeRecord>(StringComparer.Ordinal);
         private readonly object _gate = new object();
 
-        public bool TryGet(string saveId, out PersistlySave save)
+        public bool TryGet(string runtimeId, out PersistlyRuntimeRecord save)
         {
             lock (_gate)
             {
-                return _saves.TryGetValue(saveId, out save);
+                return _saves.TryGetValue(runtimeId, out save);
             }
         }
 
-        public void Store(PersistlySave save)
+        public void Store(PersistlyRuntimeRecord save)
         {
             if (save == null)
             {
@@ -39,15 +39,15 @@ namespace Persistly.Unity
 
             lock (_gate)
             {
-                _saves[save.SaveId] = save;
+                _saves[save.RuntimeId] = save;
             }
         }
 
-        public void Clear(string saveId)
+        public void Clear(string runtimeId)
         {
             lock (_gate)
             {
-                _saves.Remove(saveId);
+                _saves.Remove(runtimeId);
             }
         }
     }
@@ -67,7 +67,7 @@ namespace Persistly.Unity
             AccountSessionToken = accountSessionToken;
             SlotId = slotId;
             SlotInfoJson = slotInfoJson;
-            StateJson = stateJson;
+            DataJson = stateJson;
             BaseVersion = baseVersion;
             UpdatedAt = updatedAt;
         }
@@ -80,7 +80,7 @@ namespace Persistly.Unity
 
         public string SlotInfoJson { get; }
 
-        public string StateJson { get; }
+        public string DataJson { get; }
 
         public int? BaseVersion { get; }
 
@@ -195,7 +195,7 @@ namespace Persistly.Unity
                 { "accountSessionToken", draft.AccountSessionToken },
                 { "slotId", draft.SlotId },
                 { "slotInfo", PersistlyJson.ParseJsonValue(draft.SlotInfoJson, "slotInfo") },
-                { "state", PersistlyJson.ParseJsonValue(draft.StateJson, "state") },
+                { "state", PersistlyJson.ParseJsonValue(draft.DataJson, "state") },
                 { "baseVersion", draft.BaseVersion },
                 { "updatedAt", draft.UpdatedAt.ToString("O", CultureInfo.InvariantCulture) }
             };

@@ -58,14 +58,14 @@ await PersistlyGameSaves.Shared.SaveDataAsync(new PlayerSaveState
 var loaded = await PersistlyGameSaves.Shared.LoadDataAsync<PlayerSaveState>();
 if (loaded.Status == PersistlySlotStatus.LocalFound)
 {
-    var state = loaded.State;
+    var data = loaded.State;
 }
 
 var sync = await PersistlyGameSaves.Shared.ForceSyncDataAsync();
 if (sync.Status == PersistlySlotStatus.Conflict)
 {
     var inspect = PersistlyGameSaves.Shared.InspectData();
-    // inspect.StateJson is local gameplay state; inspect.CloudStateJson is the canonical cloud version.
+    // inspect contains separate local and cloud data branches for your conflict UI.
 }
 
 // After restoring an account session on another device, pull the default cloud slot.
@@ -79,7 +79,7 @@ public sealed class PlayerSaveState
 }
 ```
 
-`SaveDataAsync` writes local gameplay state immediately to the default `autosave` slot and guarantees a local account envelope exists. The first `ForceSyncDataAsync`, `SyncDueSlotsAsync`, or `SyncDueAsync` call creates the remote Persistly account and the matching slot if needed.
+`SaveDataAsync` writes local gameplay data immediately to the default `autosave` slot and guarantees a local account envelope exists. The first `ForceSyncDataAsync`, `SyncDueSlotsAsync`, or `SyncDueAsync` call creates the remote Persistly account and the matching slot if needed.
 
 ## Accounts And Restore
 
@@ -104,7 +104,7 @@ await PersistlyGameSaves.Shared.AttachWithTransferCodeAsync("P7K2D-M9Q4R", devic
 await PersistlyGameSaves.Shared.RefreshDataAsync();
 ```
 
-Transfer codes are temporary, one-use account-session bootstrap codes. They are not authentication credentials, and `AttachWithTransferCodeAsync` requires empty local account/slot state just like `AttachAccountAsync`. If the device already has local progress for another player, call `ClearLocalAccountAsync()` only after the player chooses to replace that local state.
+Transfer codes are temporary, one-use account-session bootstrap codes. They are not authentication credentials, and `AttachWithTransferCodeAsync` requires empty local account/slot data just like `AttachAccountAsync`. If the device already has local progress for another player, call `ClearLocalAccountAsync()` only after the player chooses to replace that local data.
 
 `GetAccountSession()` hides the token by default:
 
@@ -128,10 +128,10 @@ await PersistlyGameSaves.Shared.AttachAccountAsync(
 Facade rules:
 
 - `CreateAccountAsync()` creates and stores one local facade account, then syncs it to Persistly.
-- `CreateAccountAsync()` rejects if local account or slot state already exists.
-- `AttachAccountAsync()` loads an already existing Persistly account into empty local state.
+- `CreateAccountAsync()` rejects if local account or slot data already exists.
+- `AttachAccountAsync()` loads an already existing Persistly account into empty local data.
 - `CreateTransferCodeAsync()` requires a stored account session and never returns account data or a session token.
-- `AttachWithTransferCodeAsync()` consumes a transfer code into empty local state and stores the returned account session.
+- `AttachWithTransferCodeAsync()` consumes a transfer code into empty local data and stores the returned account session.
 - If you want to switch players on the same device, call `ClearLocalAccountAsync()` first.
 
 To sign out locally or wipe the current local player namespace:
@@ -140,7 +140,7 @@ To sign out locally or wipe the current local player namespace:
 await PersistlyGameSaves.Shared.ClearLocalAccountAsync();
 ```
 
-That clears the stored local account session and all local slots for the current local namespace. If you support account switching, call `ConfigureAsync(...)` again with the next player's identity or `LocalAccountKey` after clearing local state.
+That clears the stored local account session and all local slots for the current local namespace. If you support account switching, call `ConfigureAsync(...)` again with the next player's identity or `LocalAccountKey` after clearing local data.
 
 To permanently remove persisted runtime account data:
 
@@ -151,10 +151,10 @@ await PersistlyGameSaves.Shared.DeleteSlotAsync("autosave");
 
 Delete rules:
 
-- `DeleteAccountAsync()` clears local state either way.
-- If account has `AccountId` plus `AccountSessionToken`, `DeleteAccountAsync()` deletes remote account first.
+- `DeleteAccountAsync()` clears local data either way.
+- If account has `AccountId` plus `AccountSessionToken`, `DeleteAccountAsync()` deletes remote account data first.
 - If local slot has never synced, `DeleteSlotAsync()` removes it locally only.
-- If local slot has `slotId`, `DeleteSlotAsync()` deletes remote slot then removes local slot state.
+- If local slot has `slotId`, `DeleteSlotAsync()` deletes remote slot then removes local slot data.
 
 ## Account Data
 
@@ -183,17 +183,17 @@ Use named slots for gameplay saves:
 
 - `DefaultSlotId` is `autosave`.
 - `SaveDataAsync`, `LoadDataAsync`, `InspectData`, `RefreshDataAsync`, `ForceSyncDataAsync`, `AcceptCloudDataAsync`, `OverwriteCloudDataAsync`, and `KeepLocalDataForLaterAsync` are convenience aliases for one-save games.
-- `SaveSlotAsync` writes local state immediately.
+- `SaveSlotAsync` writes local data immediately.
 - `LoadSlotAsync`, `ListSlotDataAsync`, and `InspectSlot` are local-only.
 - `ForceSyncAsync` syncs one slot and respects manual cooldown unless `BypassCooldown` is set.
 - `SyncDueSlotsAsync` syncs dirty slots only when the runtime policy allows it.
 - `ArchiveSlotAsync` archives remotely before marking a local slot archived.
 - `DeleteSlotAsync` deletes remotely for synced slots and falls back to local-only removal for unsynced slots.
-- `DeleteAccountAsync` deletes remote account when session-backed, then clears all local slot/account state.
+- `DeleteAccountAsync` deletes remote account when session-backed, then clears all local slot/account data.
 - `ClearLocalAccountAsync` removes the stored local account session and all local slots for the current namespace.
 - No automatic background timers are started by the SDK.
 
-Conflicts keep local and cloud state separate. Local gameplay state is never overwritten automatically. Use:
+Conflicts keep local and cloud data separate. Local gameplay data is never overwritten automatically. Use:
 
 - `AcceptCloudDataAsync`
 - `OverwriteCloudDataAsync`
@@ -212,18 +212,17 @@ Conflicts keep local and cloud state separate. Local gameplay state is never ove
 - `LoadAccountSlotAsync`
 - `DeleteAccountAsync`
 - `DeleteAccountSlotAsync`
-- `SyncAccountSlotAsync`
+- `SyncAccountSlotAsync` with `PersistlySyncAccountSlotRequest`
 - `SyncAccountDataAsync`
 - `ArchiveSlotAsync`
 - `CreateTransferCodeAsync`
 - `ConsumeTransferCodeAsync`
 - typed `slot_already_exists` and `slot_archived` errors
 - typed transfer-code errors such as `transfer_code_invalid`, `transfer_code_expired`, and `transfer_code_consumed`
-- advanced raw `CreateSaveAsync`, `LoadSaveAsync`, and `SyncSaveAsync`
 
-Account slot requests send `slotId`, `slotInfo`, and `data` directly. Public account and slot responses do not expose internal save ids.
+Account slot requests send `slotId`, `slotInfo`, and `data` directly. Public account and slot responses do not expose internal runtime ids.
 
-`PersistlyClient.CreateAccountAsync(...)` is intentionally a low-level runtime API call. It always attempts remote account creation and does not inspect local facade state. Normal game code should prefer `EnsureAccountAsync()` and slot sync through `PersistlyGameSaves`.
+`PersistlyClient.CreateAccountAsync(...)` is intentionally a low-level runtime API call. It always attempts remote account creation and does not inspect local facade data. Normal game code should prefer `EnsureAccountAsync()` and slot sync through `PersistlyGameSaves`.
 
 ## Contract Bundle
 
