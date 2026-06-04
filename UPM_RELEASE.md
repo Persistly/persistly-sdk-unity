@@ -13,7 +13,7 @@ https://github.com/Persistly/persistly-sdk-unity.git?path=/
 Stable release tag:
 
 ```text
-https://github.com/Persistly/persistly-sdk-unity.git?path=/#v1.0.0
+https://github.com/Persistly/persistly-sdk-unity.git#v1.0.0
 ```
 
 ## Package

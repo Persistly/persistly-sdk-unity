@@ -3,10 +3,10 @@
 ## 1.0.0
 
 - First stable public Unity SDK release.
-- Adds `PersistlyGameSaves` as the recommended game-friendly facade for named slots, local-first saves, account account data, account sessions, due-slot sync, force sync, and explicit conflict states.
+- Adds `PersistlyGameSaves` as the recommended game-friendly facade for named slots, local-first saves, account data, account sessions, due-slot sync, force sync, and explicit conflict states.
 - Reconciles an existing remote slot when local slot state is missing after reinstall, cache loss, or local state drift.
 - Adds account creation, account session headers, account-scoped slot load/sync, runtime config, and local autosave draft helpers.
-- Keeps raw save create/load/sync available as advanced APIs.
+- Keeps advanced integrations on the account/slot runtime client without exposing legacy raw-save compatibility as the public release path.
 - Adds dev/test live parity smoke tooling for real API validation without committing runtime keys.
 - Documents account sessions, slot ids, and canonical slot revision semantics through the pinned contract bundle.
 - Pins `persistly-contract-v0.4.0`.

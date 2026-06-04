@@ -33,7 +33,7 @@ https://github.com/Persistly/persistly-sdk-unity.git?path=/
 For the stable release tag:
 
 ```text
-https://github.com/Persistly/persistly-sdk-unity.git?path=/#v1.0.0
+https://github.com/Persistly/persistly-sdk-unity.git#v1.0.0
 ```
 
 In Unity, open Package Manager, choose **Add package from git URL**, paste the URL, then configure a `ps_test_...` or `ps_live_...` runtime key in your game code or inspector.
