@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="./assets/persistly-unity-sdk-banner.png" alt="Persistly Unity SDK - Cloud saves for Unity games" />
+</p>
+
 # Persistly Unity SDK
 
 [![CI](https://github.com/Persistly/persistly-sdk-unity/actions/workflows/ci.yml/badge.svg)](https://github.com/Persistly/persistly-sdk-unity/actions/workflows/ci.yml)
