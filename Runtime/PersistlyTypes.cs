@@ -5,6 +5,18 @@ using System.Text.RegularExpressions;
 
 namespace Persistly.Unity
 {
+    public enum PersistlyAccountMode
+    {
+        AnonymousFirst,
+        AuthRequired
+    }
+
+    public enum PersistlyAuthProvider
+    {
+        Google,
+        OidcJwt
+    }
+
     public sealed class PersistlyClientOptions
     {
         public const string DefaultBaseUrl = "https://api.persistly.app";
@@ -41,6 +53,105 @@ namespace Persistly.Unity
         public string? EngineVersion { get; set; }
 
         public string? ClientVersion { get; set; }
+    }
+
+    public sealed class PersistlyAuthOptions
+    {
+        public string? DeviceLabel { get; set; }
+    }
+
+    public sealed class PersistlyProviderSignInRequest
+    {
+        public PersistlyProviderSignInRequest(PersistlyAuthProvider provider, string token)
+        {
+            if (string.IsNullOrWhiteSpace(token))
+            {
+                throw new PersistlyConfigurationError("provider token must be set.");
+            }
+
+            Provider = provider;
+            Token = token.Trim();
+        }
+
+        public PersistlyAuthProvider Provider { get; }
+
+        public string Token { get; }
+
+        public string? DeviceLabel { get; set; }
+    }
+
+    public sealed class PersistlyAuthSessionResult
+    {
+        public PersistlyAuthSessionResult(
+            string accountId,
+            string accountSessionToken,
+            bool isNewAccount,
+            PersistlyAuthProvider linkedProvider,
+            bool wasProviderNewForAccount,
+            PersistlyRuntimeRecord? account = null,
+            PersistlySyncPolicy? syncPolicy = null)
+        {
+            if (string.IsNullOrWhiteSpace(accountId))
+            {
+                throw new PersistlyConfigurationError("auth session accountId must be set.");
+            }
+
+            if (string.IsNullOrWhiteSpace(accountSessionToken))
+            {
+                throw new PersistlyConfigurationError("auth session accountSessionToken must be set.");
+            }
+
+            AccountId = accountId;
+            AccountSessionToken = accountSessionToken;
+            IsNewAccount = isNewAccount;
+            LinkedProvider = linkedProvider;
+            WasProviderNewForAccount = wasProviderNewForAccount;
+            Account = account;
+            SyncPolicy = syncPolicy;
+        }
+
+        public string AccountId { get; }
+
+        public string AccountSessionToken { get; }
+
+        public bool IsNewAccount { get; }
+
+        public PersistlyAuthProvider LinkedProvider { get; }
+
+        public bool WasProviderNewForAccount { get; }
+
+        public PersistlyRuntimeRecord? Account { get; }
+
+        public PersistlySyncPolicy? SyncPolicy { get; }
+    }
+
+    public sealed class PersistlyLinkedProviderDisplay
+    {
+        public PersistlyLinkedProviderDisplay(string? label = null, string? emailHint = null)
+        {
+            Label = label;
+            EmailHint = emailHint;
+        }
+
+        public string? Label { get; }
+
+        public string? EmailHint { get; }
+    }
+
+    public sealed class PersistlyLinkedProvider
+    {
+        public PersistlyLinkedProvider(PersistlyAuthProvider provider, PersistlyLinkedProviderDisplay display, string linkedAt)
+        {
+            Provider = provider;
+            Display = display;
+            LinkedAt = linkedAt;
+        }
+
+        public PersistlyAuthProvider Provider { get; }
+
+        public PersistlyLinkedProviderDisplay Display { get; }
+
+        public string LinkedAt { get; }
     }
 
     public sealed class PersistlyCreateAccountRequest

@@ -19,7 +19,8 @@ namespace Persistly.Unity
         Synced,
         Conflict,
         Offline,
-        RateLimited
+        RateLimited,
+        AuthRequired
     }
 
     public enum PersistlyGameSaveTarget
@@ -38,7 +39,8 @@ namespace Persistly.Unity
         Synced,
         Conflict,
         Offline,
-        RateLimited
+        RateLimited,
+        AuthRequired
     }
 
     public sealed class PersistlyGameSaveResult
@@ -203,6 +205,8 @@ namespace Persistly.Unity
         public string? AccountId { get; set; }
 
         public string? AccountSessionToken { get; set; }
+
+        public PersistlyAccountMode AccountMode { get; set; } = PersistlyAccountMode.AnonymousFirst;
 
         public IPersistlyTransport? Transport { get; set; }
 
@@ -673,6 +677,62 @@ namespace Persistly.Unity
             return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Synced);
         }
 
+        public Task<PersistlyAuthSessionResult> SignInWithGoogleIdTokenAsync(
+            string idToken,
+            PersistlyAuthOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(idToken))
+            {
+                throw new PersistlyConfigurationError("sign_in_google_invalid_input: SignInWithGoogleIdTokenAsync requires a non-empty idToken.");
+            }
+
+            var request = new PersistlyProviderSignInRequest(PersistlyAuthProvider.Google, idToken)
+            {
+                DeviceLabel = options?.DeviceLabel
+            };
+            return SignInWithProviderAsync(request, cancellationToken);
+        }
+
+        public async Task<PersistlyAuthSessionResult> SignInWithProviderAsync(
+            PersistlyProviderSignInRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            var result = await _client.CreateAuthSessionAsync(request, CurrentAccountIdOrNull(), CurrentAccountSessionTokenOrNull(), cancellationToken);
+            ApplyAuthSessionResult(result);
+            return result;
+        }
+
+        public async Task<PersistlyAuthSessionResult> LinkProviderAsync(
+            PersistlyProviderSignInRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            if (!HasAccountSession())
+            {
+                throw new PersistlyConfigurationError("link_provider_missing_account_session: LinkProviderAsync requires a stored accountId and accountSessionToken.");
+            }
+
+            var result = await _client.CreateAuthSessionAsync(request, _account.AccountId, _account.AccountSessionToken, cancellationToken);
+            ApplyAuthSessionResult(result);
+            return result;
+        }
+
+        public Task<IReadOnlyList<PersistlyLinkedProvider>> ListLinkedProvidersAsync(CancellationToken cancellationToken = default)
+        {
+            if (!HasAccountSession())
+            {
+                throw new PersistlyConfigurationError("list_linked_providers_missing_account_session: ListLinkedProvidersAsync requires a stored accountId and accountSessionToken.");
+            }
+
+            return _client.ListLinkedProvidersAsync(_account.AccountId!, _account.AccountSessionToken!, cancellationToken);
+        }
+
+        public Task SignOutAsync()
+        {
+            ResetLocalAccountState();
+            return Task.CompletedTask;
+        }
+
         public async Task<PersistlyGameSaveResult> EnsureAccountAsync(CancellationToken cancellationToken = default)
         {
             if (HasAccountSession())
@@ -684,6 +744,11 @@ namespace Persistly.Unity
                 }
 
                 return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.LocalFound);
+            }
+
+            if (Settings.AccountMode == PersistlyAccountMode.AuthRequired)
+            {
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.AuthRequired);
             }
 
             var created = await _client.CreateAccountAsync(new PersistlyCreateAccountRequest(
@@ -750,6 +815,11 @@ namespace Persistly.Unity
                 return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.NoChanges);
             }
 
+            if (Settings.AccountMode == PersistlyAccountMode.AuthRequired && !HasAccountSession())
+            {
+                return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.AuthRequired);
+            }
+
             if (!options.BypassCooldown && IsInCooldown(_account.LastForceSyncAt, _account.SyncPolicy.ForceSyncCooldownSeconds))
             {
                 return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Cooldown);
@@ -809,6 +879,11 @@ namespace Persistly.Unity
             if (!_account.Dirty)
             {
                 return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.NoChanges));
+            }
+
+            if (Settings.AccountMode == PersistlyAccountMode.AuthRequired && !HasAccountSession())
+            {
+                return Task.FromResult(new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.AuthRequired));
             }
 
             if (IsInCooldown(_account.LastRemoteSyncAt, _account.SyncPolicy.MinRemoteSyncIntervalSeconds))
@@ -878,7 +953,10 @@ namespace Persistly.Unity
                 SaveSlot(slot);
             }
 
-            return Task.FromResult(new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.LocalSaved));
+            var status = Settings.AccountMode == PersistlyAccountMode.AuthRequired && !HasAccountSession()
+                ? PersistlySlotStatus.AuthRequired
+                : PersistlySlotStatus.LocalSaved;
+            return Task.FromResult(new PersistlySlotResult(normalizedSlotId, status));
         }
 
         public Task<PersistlySlotResult<TState>> LoadSlotAsync<TState>(string slotId) where TState : class
@@ -1021,6 +1099,11 @@ namespace Persistly.Unity
             {
                 if (!HasAccountSession())
                 {
+                    if (Settings.AccountMode == PersistlyAccountMode.AuthRequired)
+                    {
+                        return new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.AuthRequired);
+                    }
+
                     var created = await _client.CreateAccountAsync(new PersistlyCreateAccountRequest(
                         _account.AccountDataJson,
                         playerRef: Settings.PlayerRef,
@@ -1139,6 +1222,12 @@ namespace Persistly.Unity
                         results.Add(new PersistlySlotResult(key, PersistlySlotStatus.Cooldown));
                     }
 
+                    continue;
+                }
+
+                if (Settings.AccountMode == PersistlyAccountMode.AuthRequired && !HasAccountSession())
+                {
+                    results.Add(new PersistlySlotResult(key, PersistlySlotStatus.AuthRequired));
                     continue;
                 }
 
@@ -1370,6 +1459,27 @@ namespace Persistly.Unity
 
                 _account.SyncPolicy = response.SyncPolicy;
                 ApplyAccountSave(response.Account, dirty);
+                SaveAccount();
+            }
+        }
+
+        private void ApplyAuthSessionResult(PersistlyAuthSessionResult result)
+        {
+            lock (_gate)
+            {
+                _account.AccountId = result.AccountId;
+                _account.AccountSessionToken = result.AccountSessionToken;
+                if (result.SyncPolicy != null)
+                {
+                    _account.SyncPolicy = result.SyncPolicy;
+                }
+
+                if (result.Account != null)
+                {
+                    ApplyAccountSave(result.Account, false);
+                }
+
+                _account.LastRemoteSyncAt = DateTimeOffset.UtcNow;
                 SaveAccount();
             }
         }
@@ -1609,6 +1719,16 @@ namespace Persistly.Unity
         private bool HasAccountSession()
         {
             return !string.IsNullOrWhiteSpace(_account.AccountId) && !string.IsNullOrWhiteSpace(_account.AccountSessionToken);
+        }
+
+        private string? CurrentAccountSessionTokenOrNull()
+        {
+            return HasAccountSession() ? _account.AccountSessionToken : null;
+        }
+
+        private string? CurrentAccountIdOrNull()
+        {
+            return HasAccountSession() ? _account.AccountId : null;
         }
 
         private static bool IsInCooldown(DateTimeOffset? lastSync, int cooldownSeconds)

@@ -22,6 +22,9 @@ namespace Persistly.Unity
         TransferCodeConsumed,
         TransferCodeRateLimited,
         TransferCodeDisabled,
+        ProviderTokenInvalid,
+        AuthProviderNotConfigured,
+        AccountAuthConflict,
         ServerError
     }
 
@@ -233,6 +236,30 @@ namespace Persistly.Unity
     {
         public PersistlyTransferCodeDisabledError(int statusCode, string message, string? detailsJson = null)
             : base(statusCode, PersistlyErrorCode.TransferCodeDisabled, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyProviderTokenInvalidError : PersistlyApiError
+    {
+        public PersistlyProviderTokenInvalidError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.ProviderTokenInvalid, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyAuthProviderNotConfiguredError : PersistlyApiError
+    {
+        public PersistlyAuthProviderNotConfiguredError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.AuthProviderNotConfigured, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyAccountAuthConflictError : PersistlyApiError
+    {
+        public PersistlyAccountAuthConflictError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.AccountAuthConflict, message, detailsJson)
         {
         }
     }

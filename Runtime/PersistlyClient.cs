@@ -180,6 +180,59 @@ namespace Persistly.Unity
             return consumed;
         }
 
+        public async Task<PersistlyAuthSessionResult> CreateAuthSessionAsync(
+            PersistlyProviderSignInRequest request,
+            string? currentAccountId = null,
+            string? currentAccountSessionToken = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (request == null)
+            {
+                throw new ArgumentNullException(nameof(request));
+            }
+
+            var response = await SendJsonAsync(
+                "POST",
+                "/api/v1/accounts/auth/session",
+                BuildAuthSessionBody(request),
+                cancellationToken,
+                acceptConflictStatus: true,
+                accountId: currentAccountId,
+                accountSessionToken: currentAccountSessionToken);
+
+            if (response.StatusCode == 409)
+            {
+                throw ParseApiError(response.StatusCode, response.Body, response.Error);
+            }
+
+            var result = ParseAuthSessionResponse(response.Body);
+            if (result.Account != null)
+            {
+                _cache.Store(result.Account);
+            }
+
+            return result;
+        }
+
+        public async Task<IReadOnlyList<PersistlyLinkedProvider>> ListLinkedProvidersAsync(
+            string accountId,
+            string accountSessionToken,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureRuntimeId(accountId);
+            EnsureSessionToken(accountSessionToken);
+
+            var response = await SendJsonAsync(
+                "GET",
+                "/api/v1/accounts/auth/providers",
+                null,
+                cancellationToken,
+                accountId: accountId,
+                accountSessionToken: accountSessionToken);
+
+            return ParseLinkedProviders(response.Body);
+        }
+
         public async Task<PersistlyDeleteAccountResponse> DeleteAccountAsync(string accountId, string accountSessionToken, CancellationToken cancellationToken = default)
         {
             EnsureRuntimeId(accountId);
@@ -436,6 +489,7 @@ namespace Persistly.Unity
             string? body,
             CancellationToken cancellationToken,
             bool acceptConflictStatus = false,
+            string? accountId = null,
             string? accountSessionToken = null)
         {
             var headers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
@@ -458,6 +512,10 @@ namespace Persistly.Unity
             if (!string.IsNullOrWhiteSpace(accountSessionToken))
             {
                 headers["X-Persistly-Account-Session"] = accountSessionToken.Trim();
+            }
+            if (!string.IsNullOrWhiteSpace(accountId))
+            {
+                headers["X-Persistly-Account-ID"] = accountId.Trim();
             }
 
             var request = new PersistlyTransportRequest(method, new Uri(_baseUri, relativePath).ToString(), body, _timeoutSeconds, headers);
@@ -575,6 +633,20 @@ namespace Persistly.Unity
             return body;
         }
 
+        private static string BuildAuthSessionBody(PersistlyProviderSignInRequest request)
+        {
+            var body = "{";
+            body += "\"provider\":" + PersistlyJson.EscapeJsonString(ToWireProvider(request.Provider));
+            body += ",\"token\":" + PersistlyJson.EscapeJsonString(request.Token);
+            if (!string.IsNullOrWhiteSpace(request.DeviceLabel))
+            {
+                body += ",\"deviceLabel\":" + PersistlyJson.EscapeJsonString(request.DeviceLabel!.Trim());
+            }
+
+            body += "}";
+            return body;
+        }
+
         private static string BuildSyncAccountDataBody(PersistlySyncAccountDataRequest request)
         {
             var body = "{";
@@ -637,6 +709,59 @@ namespace Persistly.Unity
                 GetRequiredString(root, "transferCode", "create transfer code response"),
                 GetRequiredString(root, "expiresAt", "create transfer code response"),
                 GetRequiredInt(root, "expiresInSeconds", "create transfer code response"));
+        }
+
+        private static PersistlyAuthSessionResult ParseAuthSessionResponse(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "auth session response"), "auth session response");
+            PersistlyRuntimeRecord? account = null;
+            if (TryGetObject(root, "account", out var accountRoot) && accountRoot != null)
+            {
+                account = ParseAccountObjectAsSave(accountRoot);
+            }
+
+            var syncPolicy = root.ContainsKey("syncPolicy")
+                ? ParseSyncPolicy(GetRequiredObject(root, "syncPolicy", "auth session response"))
+                : null;
+
+            return new PersistlyAuthSessionResult(
+                GetRequiredString(root, "accountId", "auth session response"),
+                GetRequiredString(root, "accountSessionToken", "auth session response"),
+                GetRequiredBool(root, "isNewAccount", "auth session response"),
+                ParseWireProvider(GetRequiredString(root, "linkedProvider", "auth session response")),
+                GetRequiredBool(root, "wasProviderNewForAccount", "auth session response"),
+                account,
+                syncPolicy);
+        }
+
+        private static IReadOnlyList<PersistlyLinkedProvider> ParseLinkedProviders(string body)
+        {
+            var providers = PersistlyJson.ParseJsonValue(body, "linked providers response") as List<object?>;
+            if (providers == null)
+            {
+                throw new PersistlyConfigurationError("linked providers response must be a JSON array.");
+            }
+
+            var result = new List<PersistlyLinkedProvider>(providers.Count);
+            foreach (var item in providers)
+            {
+                var providerRoot = item as Dictionary<string, object?>;
+                if (providerRoot == null)
+                {
+                    throw new PersistlyConfigurationError("linked provider entries must be JSON objects.");
+                }
+
+                var display = providerRoot.ContainsKey("display") && providerRoot["display"] is Dictionary<string, object?> displayRoot
+                    ? new PersistlyLinkedProviderDisplay(GetOptionalString(displayRoot, "label"), GetOptionalString(displayRoot, "emailHint"))
+                    : new PersistlyLinkedProviderDisplay();
+
+                result.Add(new PersistlyLinkedProvider(
+                    ParseWireProvider(GetRequiredString(providerRoot, "provider", "linked provider")),
+                    display,
+                    GetRequiredString(providerRoot, "linkedAt", "linked provider")));
+            }
+
+            return result;
         }
 
         private static PersistlyDeleteAccountResponse ParseDeleteAccountResponse(string body)
@@ -1141,6 +1266,21 @@ namespace Persistly.Unity
                     {
                         return new PersistlyTransferCodeDisabledError(statusCode, message, detailsJson);
                     }
+
+                    if (code == PersistlyErrorCode.ProviderTokenInvalid)
+                    {
+                        return new PersistlyProviderTokenInvalidError(statusCode, message, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.AuthProviderNotConfigured)
+                    {
+                        return new PersistlyAuthProviderNotConfiguredError(statusCode, message, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.AccountAuthConflict)
+                    {
+                        return new PersistlyAccountAuthConflictError(statusCode, message, detailsJson);
+                    }
                 }
                 catch (PersistlyConfigurationError)
                 {
@@ -1184,6 +1324,12 @@ namespace Persistly.Unity
                     return new PersistlyTransferCodeRateLimitedError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.TransferCodeDisabled:
                     return new PersistlyTransferCodeDisabledError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.ProviderTokenInvalid:
+                    return new PersistlyProviderTokenInvalidError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.AuthProviderNotConfigured:
+                    return new PersistlyAuthProviderNotConfiguredError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.AccountAuthConflict:
+                    return new PersistlyAccountAuthConflictError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.ServerError:
                 default:
                     return new PersistlyServerError(statusCode, message, detailsJson);
@@ -1228,6 +1374,12 @@ namespace Persistly.Unity
                     return PersistlyErrorCode.TransferCodeRateLimited;
                 case "transfer_code_disabled":
                     return PersistlyErrorCode.TransferCodeDisabled;
+                case "provider_token_invalid":
+                    return PersistlyErrorCode.ProviderTokenInvalid;
+                case "auth_provider_not_configured":
+                    return PersistlyErrorCode.AuthProviderNotConfigured;
+                case "account_auth_conflict":
+                    return PersistlyErrorCode.AccountAuthConflict;
                 case "server_error":
                     return PersistlyErrorCode.ServerError;
                 default:
@@ -1288,6 +1440,32 @@ namespace Persistly.Unity
         public static PersistlyApiError ParseErrorForTests(int statusCode, string body)
         {
             return ParseApiError(statusCode, body, null);
+        }
+
+        private static string ToWireProvider(PersistlyAuthProvider provider)
+        {
+            switch (provider)
+            {
+                case PersistlyAuthProvider.Google:
+                    return "google";
+                case PersistlyAuthProvider.OidcJwt:
+                    return "oidc_jwt";
+                default:
+                    throw new PersistlyConfigurationError("Unknown auth provider: " + provider + ".");
+            }
+        }
+
+        private static PersistlyAuthProvider ParseWireProvider(string provider)
+        {
+            switch (provider)
+            {
+                case "google":
+                    return PersistlyAuthProvider.Google;
+                case "oidc_jwt":
+                    return PersistlyAuthProvider.OidcJwt;
+                default:
+                    throw new PersistlyConfigurationError("Unknown auth provider: " + provider + ".");
+            }
         }
 
         private static bool IsErrorResponse(string body)

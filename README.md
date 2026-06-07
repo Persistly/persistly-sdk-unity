@@ -18,7 +18,8 @@ The recommended Unity flow is facade-first:
 2. For one-save games, use `SaveDataAsync` and `LoadDataAsync`.
 3. For manual saves or slots, use named slots through `SaveSlotAsync` and `LoadSlotAsync`.
 4. Call `ForceSyncDataAsync`, `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueAccountAsync` from explicit lifecycle/safe-sync points.
-5. Use `PersistlyClient` directly only for advanced runtime API access.
+5. Optional auth bridge helpers can exchange Google or OIDC/JWT tokens for a Persistly account session.
+6. Use `PersistlyClient` directly only for advanced runtime API access.
 
 This package is `1.0.0` and pins `persistly-contract-v0.4.0`.
 
@@ -84,6 +85,56 @@ public sealed class PlayerSaveState
 ```
 
 `SaveDataAsync` writes local gameplay data immediately to the default `autosave` slot and guarantees a local account envelope exists. The first `ForceSyncDataAsync`, `SyncDueSlotsAsync`, or `SyncDueAsync` call creates the remote Persistly account and the matching slot if needed.
+
+## Account Modes And Auth Bridge
+
+`AnonymousFirst` is the default account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous remote account on the first cloud sync, then link Google or OIDC/JWT later.
+
+Use `AuthRequired` when your game requires sign-in before cloud sync:
+
+```csharp
+await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_...")
+{
+    AccountMode = PersistlyAccountMode.AuthRequired,
+    Store = new FilePersistlyGameSavesStore(Application.persistentDataPath)
+});
+
+var local = await PersistlyGameSaves.Shared.SaveDataAsync(new PlayerSaveState
+{
+    Gold = 50,
+    Level = 1
+});
+
+if (local.Status == PersistlySlotStatus.AuthRequired)
+{
+    ShowSignInPrompt();
+}
+
+await PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync(googleIdToken, new PersistlyAuthOptions
+{
+    DeviceLabel = SystemInfo.deviceName
+});
+
+await PersistlyGameSaves.Shared.ForceSyncDataAsync();
+```
+
+In `AuthRequired` mode, local saves and loads still work before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a provider token is exchanged for a Persistly account session.
+
+Generic OIDC/JWT sign-in and provider linking use the same facade:
+
+```csharp
+await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.OidcJwt, oidcJwt)
+{
+    DeviceLabel = SystemInfo.deviceName
+});
+
+await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Google, googleIdToken));
+
+var providers = await PersistlyGameSaves.Shared.ListLinkedProvidersAsync();
+await PersistlyGameSaves.Shared.SignOutAsync();
+```
+
+Provider tokens are only sent to `POST /api/v1/accounts/auth/session`. Normal save/load/sync calls use the returned Persistly `accountId` and `accountSessionToken`.
 
 ## Accounts And Restore
 
@@ -180,6 +231,7 @@ Account data sync preserves server-owned `slots`; it never rewrites slot referen
 - `templates/one-save` for idle, casual, and one-save games.
 - `templates/multi-slot` for manual saves, campaigns, and slot select screens.
 - `templates/account-slots` for games with sign-in or cross-device restore.
+- `templates/auth-required` for games that require Google or OIDC/JWT sign-in before cloud sync.
 
 ## Slots And Conflicts
 
@@ -221,8 +273,11 @@ Conflicts keep local and cloud data separate. Local gameplay data is never overw
 - `ArchiveSlotAsync`
 - `CreateTransferCodeAsync`
 - `ConsumeTransferCodeAsync`
+- `CreateAuthSessionAsync`
+- `ListLinkedProvidersAsync`
 - typed `slot_already_exists` and `slot_archived` errors
 - typed transfer-code errors such as `transfer_code_invalid`, `transfer_code_expired`, and `transfer_code_consumed`
+- typed auth bridge errors such as `provider_token_invalid`, `auth_provider_not_configured`, and `account_auth_conflict`
 
 Account slot requests send `slotId`, `slotInfo`, and `data` directly. Public account and slot responses do not expose internal runtime ids.
 
@@ -285,5 +340,6 @@ Release slotInfo lives in `UPM_RELEASE.md`.
 ## Examples
 
 - `examples/MinimalUsage.cs` for a minimal facade-first snippet
+- `examples/AuthGoogleUsage.cs` and `examples/AuthOidcUsage.cs` for auth bridge snippets
 - `SampleProject/Assets/LastBeacon/` for the playable endless-idle sample
 - `SampleProject/Assets/Scenes/LastBeacon.unity` for the generated demo scene

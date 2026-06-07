@@ -15,3 +15,8 @@ Runtime delete helpers also exist on same facade:
 
 - `DeleteSlotAsync("autosave")` for one slot
 - `DeleteAccountAsync()` for whole stored account namespace
+
+Auth-specific examples are separate from the minimal flow:
+
+- `AuthGoogleUsage.cs` shows `AuthRequired` mode with Google ID token sign-in.
+- `AuthOidcUsage.cs` shows generic OIDC/JWT sign-in plus provider linking.

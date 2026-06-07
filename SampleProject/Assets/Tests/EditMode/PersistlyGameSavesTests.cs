@@ -29,6 +29,12 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(Enum.IsDefined(typeof(PersistlyGameSaveStatus), PersistlyGameSaveStatus.RateLimited), Is.True);
             Assert.That(Enum.IsDefined(typeof(PersistlyGameSaveTarget), PersistlyGameSaveTarget.Account), Is.True);
             Assert.That(Enum.IsDefined(typeof(PersistlyGameSaveTarget), PersistlyGameSaveTarget.Slot), Is.True);
+            Assert.That(Enum.IsDefined(typeof(PersistlyGameSaveStatus), PersistlyGameSaveStatus.AuthRequired), Is.True);
+            Assert.That(Enum.IsDefined(typeof(PersistlySlotStatus), PersistlySlotStatus.AuthRequired), Is.True);
+            Assert.That(Enum.IsDefined(typeof(PersistlyAccountMode), PersistlyAccountMode.AnonymousFirst), Is.True);
+            Assert.That(Enum.IsDefined(typeof(PersistlyAccountMode), PersistlyAccountMode.AuthRequired), Is.True);
+            Assert.That(Enum.IsDefined(typeof(PersistlyAuthProvider), PersistlyAuthProvider.Google), Is.True);
+            Assert.That(Enum.IsDefined(typeof(PersistlyAuthProvider), PersistlyAuthProvider.OidcJwt), Is.True);
         }
 
         [Test]
@@ -412,6 +418,182 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(second.Status, Is.EqualTo(PersistlySlotStatus.Cooldown));
             Assert.That(transport.Requests[0].Body, Does.Contain("\"slot\""));
             Assert.That(transport.Requests[0].Body, Does.Contain("\"slotInfo\""));
+        }
+
+        [Test]
+        public async Task AnonymousFirstIsDefaultAndStillCreatesAccountOnFirstSync()
+        {
+            var transport = new QueueTransport(
+                new PersistlyTransportResponse(201, "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_account_session\",\"account\":{\"runtimeId\":\"acc_account\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[{\"slotId\":\"autosave\",\"slotInfo\":{}}]},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"slot\":{\"runtimeId\":\"autosave\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"Level\":1,\"Gold\":10},\"version\":1,\"createdAt\":\"2026-04-10T00:00:00Z\",\"updatedAt\":\"2026-04-10T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"));
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                Transport = transport,
+                SyncPolicy = new PersistlySyncPolicy(60, 0, true, true, true, 25)
+            });
+
+            await PersistlyGameSaves.Shared.SaveDataAsync(new TestSaveState { Level = 1, Gold = 10 });
+            var synced = await PersistlyGameSaves.Shared.ForceSyncDataAsync(new PersistlySyncOptions { BypassCooldown = true });
+
+            Assert.That(PersistlyGameSaves.Shared.Settings.AccountMode, Is.EqualTo(PersistlyAccountMode.AnonymousFirst));
+            Assert.That(synced.Status, Is.EqualTo(PersistlySlotStatus.Synced));
+            Assert.That(transport.Requests.Count, Is.EqualTo(1));
+            Assert.That(transport.Requests[0].Url, Does.EndWith("/api/v1/accounts"));
+        }
+
+        [Test]
+        public async Task AuthRequiredKeepsSavesLocalAndDoesNotCreateAnonymousAccountBeforeSignIn()
+        {
+            var transport = new QueueTransport();
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                AccountMode = PersistlyAccountMode.AuthRequired,
+                Transport = transport,
+                SyncPolicy = new PersistlySyncPolicy(60, 0, true, true, true, 25)
+            });
+
+            var saved = await PersistlyGameSaves.Shared.SaveDataAsync(new TestSaveState { Level = 1, Gold = 10 });
+            var sync = await PersistlyGameSaves.Shared.ForceSyncDataAsync(new PersistlySyncOptions { BypassCooldown = true });
+            var due = await PersistlyGameSaves.Shared.SyncDueSlotsAsync(new PersistlySyncOptions { IncludeSkipped = true });
+            var loaded = await PersistlyGameSaves.Shared.LoadDataAsync<TestSaveState>();
+
+            Assert.That(saved.Status, Is.EqualTo(PersistlySlotStatus.AuthRequired));
+            Assert.That(sync.Status, Is.EqualTo(PersistlySlotStatus.AuthRequired));
+            Assert.That(due[0].Status, Is.EqualTo(PersistlySlotStatus.AuthRequired));
+            Assert.That(loaded.Status, Is.EqualTo(PersistlySlotStatus.LocalFound));
+            Assert.That(loaded.State.Level, Is.EqualTo(1));
+            Assert.That(transport.Requests.Count, Is.EqualTo(0));
+        }
+
+        [Test]
+        public async Task SignInWithGoogleIdTokenStoresReturnedAccountSession()
+        {
+            var transport = new QueueTransport(
+                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_auth\",\"accountSessionToken\":\"pst_auth_session\",\"isNewAccount\":true,\"linkedProvider\":\"google\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_auth\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{\"diamonds\":9},\"slots\":[]},\"version\":1,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"));
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                AccountMode = PersistlyAccountMode.AuthRequired,
+                Transport = transport
+            });
+
+            var result = await PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync("google-id-token", new PersistlyAuthOptions { DeviceLabel = "Unity Editor" });
+            var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
+            var account = PersistlyGameSaves.Shared.InspectAccount();
+
+            Assert.That(result.AccountId, Is.EqualTo("acc_auth"));
+            Assert.That(result.AccountSessionToken, Is.EqualTo("pst_auth_session"));
+            Assert.That(result.LinkedProvider, Is.EqualTo(PersistlyAuthProvider.Google));
+            Assert.That(result.IsNewAccount, Is.True);
+            Assert.That(result.WasProviderNewForAccount, Is.True);
+            Assert.That(session.AccountId, Is.EqualTo("acc_auth"));
+            Assert.That(session.AccountSessionToken, Is.EqualTo("pst_auth_session"));
+            Assert.That(account.AccountDataJson, Does.Contain("\"diamonds\":9"));
+            Assert.That(transport.Requests[0].Url, Does.EndWith("/api/v1/accounts/auth/session"));
+            Assert.That(transport.Requests[0].Body, Does.Contain("\"provider\":\"google\""));
+            Assert.That(transport.Requests[0].Body, Does.Contain("\"token\":\"google-id-token\""));
+            Assert.That(transport.Requests[0].Body, Does.Contain("\"deviceLabel\":\"Unity Editor\""));
+        }
+
+        [Test]
+        public async Task LinkProviderSendsCurrentAccountSessionAndListProvidersParsesSafeList()
+        {
+            var transport = new QueueTransport(
+                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_refreshed\",\"isNewAccount\":false,\"linkedProvider\":\"oidc_jwt\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_account\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[]},\"version\":2,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"}}"),
+                new PersistlyTransportResponse(200, "[{\"provider\":\"google\",\"display\":{\"label\":\"Google\",\"emailHint\":\"a***@gmail.com\"},\"linkedAt\":\"2026-06-06T00:00:00Z\"},{\"provider\":\"oidc_jwt\",\"display\":{\"label\":\"Studio Login\"},\"linkedAt\":\"2026-06-06T00:01:00Z\"}]"));
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                AccountId = "acc_account",
+                AccountSessionToken = "pst_account_session",
+                Transport = transport
+            });
+
+            var linked = await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.OidcJwt, "jwt-token")
+            {
+                DeviceLabel = "Editor"
+            });
+            var providers = await PersistlyGameSaves.Shared.ListLinkedProvidersAsync();
+            var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
+
+            Assert.That(linked.LinkedProvider, Is.EqualTo(PersistlyAuthProvider.OidcJwt));
+            Assert.That(session.AccountSessionToken, Is.EqualTo("pst_refreshed"));
+            Assert.That(providers.Count, Is.EqualTo(2));
+            Assert.That(providers[0].Provider, Is.EqualTo(PersistlyAuthProvider.Google));
+            Assert.That(providers[0].Display.Label, Is.EqualTo("Google"));
+            Assert.That(providers[0].Display.EmailHint, Is.EqualTo("a***@gmail.com"));
+            Assert.That(providers[1].Provider, Is.EqualTo(PersistlyAuthProvider.OidcJwt));
+            Assert.That(transport.Requests[0].Headers["X-Persistly-Account-ID"], Is.EqualTo("acc_account"));
+            Assert.That(transport.Requests[0].Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_account_session"));
+            Assert.That(transport.Requests[1].Headers["X-Persistly-Account-ID"], Is.EqualTo("acc_account"));
+            Assert.That(transport.Requests[1].Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_refreshed"));
+            Assert.That(transport.Requests[1].Url, Does.EndWith("/api/v1/accounts/auth/providers"));
+        }
+
+        [Test]
+        public async Task SignedInAuthRequiredSaveUsesStoredSessionForCloudSync()
+        {
+            var transport = new QueueTransport(
+                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_auth\",\"accountSessionToken\":\"pst_auth_session\",\"isNewAccount\":true,\"linkedProvider\":\"google\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_auth\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[]},\"version\":1,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"),
+                new PersistlyTransportResponse(201, "{\"accountId\":\"acc_auth\",\"account\":{\"runtimeId\":\"acc_auth\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[{\"slotId\":\"autosave\",\"slotInfo\":{}}]},\"version\":2,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:01:00Z\"},\"slot\":{\"runtimeId\":\"autosave\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"Level\":3,\"Gold\":30},\"version\":1,\"createdAt\":\"2026-06-06T00:01:00Z\",\"updatedAt\":\"2026-06-06T00:01:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"));
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                AccountMode = PersistlyAccountMode.AuthRequired,
+                Transport = transport,
+                SyncPolicy = new PersistlySyncPolicy(60, 0, true, true, true, 25)
+            });
+
+            await PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync("google-id-token");
+            await PersistlyGameSaves.Shared.SaveDataAsync(new TestSaveState { Level = 3, Gold = 30 });
+            var synced = await PersistlyGameSaves.Shared.ForceSyncDataAsync(new PersistlySyncOptions { BypassCooldown = true });
+
+            Assert.That(synced.Status, Is.EqualTo(PersistlySlotStatus.Synced));
+            Assert.That(transport.Requests[1].Url, Does.EndWith("/api/v1/accounts/acc_auth/slots"));
+            Assert.That(transport.Requests[1].Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_auth_session"));
+            Assert.That(transport.Requests[1].Body, Does.Contain("\"Level\":3"));
+        }
+
+        [Test]
+        public async Task SignOutClearsLocalAccountAndSlotsOnCurrentDevice()
+        {
+            var store = new InMemoryPersistlyGameSavesStore();
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                AccountMode = PersistlyAccountMode.AuthRequired,
+                AccountId = "acc_auth",
+                AccountSessionToken = "pst_auth_session",
+                Store = store
+            });
+            await PersistlyGameSaves.Shared.SaveDataAsync(new TestSaveState { Level = 4, Gold = 40 });
+
+            await PersistlyGameSaves.Shared.SignOutAsync();
+            var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
+            var loaded = await PersistlyGameSaves.Shared.LoadDataAsync<TestSaveState>();
+
+            Assert.That(session.AccountId, Is.Null.Or.Empty);
+            Assert.That(session.AccountSessionToken, Is.Null.Or.Empty);
+            Assert.That(loaded.Found, Is.False);
+            Assert.That(store.LoadAccountJson("player-184"), Is.Null);
+            Assert.That(store.ListSlotIds("player-184"), Is.Empty);
+        }
+
+        [Test]
+        public void AuthBridgeErrorsAreTyped()
+        {
+            var providerTokenInvalid = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"provider_token_invalid\",\"message\":\"Provider token is invalid.\"}}");
+            var providerNotConfigured = PersistlyClient.ParseErrorForTests(403, "{\"error\":{\"code\":\"auth_provider_not_configured\",\"message\":\"Auth provider is not configured.\"}}");
+            var accountConflict = PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"account_auth_conflict\",\"message\":\"This identity is already linked.\",\"details\":{\"authenticatedAccount\":{\"hasSlots\":true,\"slotCount\":3}}}}");
+
+            Assert.That(providerTokenInvalid, Is.TypeOf<PersistlyProviderTokenInvalidError>());
+            Assert.That(providerTokenInvalid.Code, Is.EqualTo(PersistlyErrorCode.ProviderTokenInvalid));
+            Assert.That(providerNotConfigured, Is.TypeOf<PersistlyAuthProviderNotConfiguredError>());
+            Assert.That(providerNotConfigured.Code, Is.EqualTo(PersistlyErrorCode.AuthProviderNotConfigured));
+            Assert.That(accountConflict, Is.TypeOf<PersistlyAccountAuthConflictError>());
+            Assert.That(accountConflict.Code, Is.EqualTo(PersistlyErrorCode.AccountAuthConflict));
+            Assert.That(accountConflict.DetailsJson, Does.Contain("authenticatedAccount"));
         }
 
         [Test]
