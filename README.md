@@ -18,7 +18,7 @@ The recommended Unity flow is facade-first:
 2. For one-save games, use `SaveDataAsync` and `LoadDataAsync`.
 3. For manual saves or slots, use named slots through `SaveSlotAsync` and `LoadSlotAsync`.
 4. Call `ForceSyncDataAsync`, `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueAccountAsync` from explicit lifecycle/safe-sync points.
-5. Optional auth bridge helpers can exchange Google or OIDC/JWT tokens for a Persistly account session.
+5. Optional auth bridge helpers can exchange Firebase ID tokens for a Persistly account session.
 6. Use `PersistlyClient` directly only for advanced runtime API access.
 
 This package is `1.0.0` and pins `persistly-contract-v0.4.0`.
@@ -88,7 +88,7 @@ public sealed class PlayerSaveState
 
 ## Account Modes And Auth Bridge
 
-`AnonymousFirst` is the default account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous remote account on the first cloud sync, then link Google or OIDC/JWT later.
+`AnonymousFirst` is the default account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous remote account on the first cloud sync, then link Firebase later.
 
 Use `AuthRequired` when your game requires sign-in before cloud sync:
 
@@ -110,7 +110,10 @@ if (local.Status == PersistlySlotStatus.AuthRequired)
     ShowSignInPrompt();
 }
 
-await PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync(googleIdToken, new PersistlyAuthOptions
+// Get the Firebase ID token from Firebase Auth SDK in your game.
+var firebaseIdToken = await firebaseUser.TokenAsync(false);
+
+await PersistlyGameSaves.Shared.SignInWithFirebaseTokenAsync(firebaseIdToken, new PersistlyAuthOptions
 {
     DeviceLabel = SystemInfo.deviceName
 });
@@ -118,17 +121,17 @@ await PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync(googleIdToken, new 
 await PersistlyGameSaves.Shared.ForceSyncDataAsync();
 ```
 
-In `AuthRequired` mode, local saves and loads still work before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a provider token is exchanged for a Persistly account session.
+In `AuthRequired` mode, local saves and loads still work before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a Firebase ID token is exchanged for a Persistly account session.
 
-Generic OIDC/JWT sign-in and provider linking use the same facade:
+Lower-level provider sign-in and provider linking are available for Firebase:
 
 ```csharp
-await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.OidcJwt, oidcJwt)
+await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, firebaseIdToken)
 {
     DeviceLabel = SystemInfo.deviceName
 });
 
-await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Google, googleIdToken));
+await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, firebaseIdToken));
 
 var providers = await PersistlyGameSaves.Shared.ListLinkedProvidersAsync();
 await PersistlyGameSaves.Shared.SignOutAsync();
@@ -231,7 +234,7 @@ Account data sync preserves server-owned `slots`; it never rewrites slot referen
 - `templates/one-save` for idle, casual, and one-save games.
 - `templates/multi-slot` for manual saves, campaigns, and slot select screens.
 - `templates/account-slots` for games with sign-in or cross-device restore.
-- `templates/auth-required` for games that require Google or OIDC/JWT sign-in before cloud sync.
+- `templates/auth-required` for games that require Firebase sign-in before cloud sync.
 
 ## Slots And Conflicts
 
@@ -340,6 +343,6 @@ Release slotInfo lives in `UPM_RELEASE.md`.
 ## Examples
 
 - `examples/MinimalUsage.cs` for a minimal facade-first snippet
-- `examples/AuthGoogleUsage.cs` and `examples/AuthOidcUsage.cs` for auth bridge snippets
+- `examples/AuthFirebaseUsage.cs` for a Firebase Auth Bridge snippet
 - `SampleProject/Assets/LastBeacon/` for the playable endless-idle sample
 - `SampleProject/Assets/Scenes/LastBeacon.unity` for the generated demo scene

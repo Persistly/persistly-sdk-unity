@@ -15,17 +15,9 @@ namespace Persistly.Templates.AuthRequired
             });
         }
 
-        public Task<PersistlyAuthSessionResult> SignInWithGoogleAsync(string googleIdToken)
+        public Task<PersistlyAuthSessionResult> SignInWithFirebaseAsync(string firebaseIdToken)
         {
-            return PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync(googleIdToken, new PersistlyAuthOptions
-            {
-                DeviceLabel = SystemInfo.deviceName
-            });
-        }
-
-        public Task<PersistlyAuthSessionResult> SignInWithOidcAsync(string oidcJwt)
-        {
-            return PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.OidcJwt, oidcJwt)
+            return PersistlyGameSaves.Shared.SignInWithFirebaseTokenAsync(firebaseIdToken, new PersistlyAuthOptions
             {
                 DeviceLabel = SystemInfo.deviceName
             });

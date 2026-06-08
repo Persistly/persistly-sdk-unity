@@ -18,5 +18,4 @@ Runtime delete helpers also exist on same facade:
 
 Auth-specific examples are separate from the minimal flow:
 
-- `AuthGoogleUsage.cs` shows `AuthRequired` mode with Google ID token sign-in.
-- `AuthOidcUsage.cs` shows generic OIDC/JWT sign-in plus provider linking.
+- `AuthFirebaseUsage.cs` shows `AuthRequired` mode with Firebase ID token sign-in.

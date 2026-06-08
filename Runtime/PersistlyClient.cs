@@ -1446,10 +1446,8 @@ namespace Persistly.Unity
         {
             switch (provider)
             {
-                case PersistlyAuthProvider.Google:
-                    return "google";
-                case PersistlyAuthProvider.OidcJwt:
-                    return "oidc_jwt";
+                case PersistlyAuthProvider.Firebase:
+                    return "firebase";
                 default:
                     throw new PersistlyConfigurationError("Unknown auth provider: " + provider + ".");
             }
@@ -1459,10 +1457,8 @@ namespace Persistly.Unity
         {
             switch (provider)
             {
-                case "google":
-                    return PersistlyAuthProvider.Google;
-                case "oidc_jwt":
-                    return PersistlyAuthProvider.OidcJwt;
+                case "firebase":
+                    return PersistlyAuthProvider.Firebase;
                 default:
                     throw new PersistlyConfigurationError("Unknown auth provider: " + provider + ".");
             }

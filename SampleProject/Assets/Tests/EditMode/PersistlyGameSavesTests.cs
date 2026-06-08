@@ -33,8 +33,8 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(Enum.IsDefined(typeof(PersistlySlotStatus), PersistlySlotStatus.AuthRequired), Is.True);
             Assert.That(Enum.IsDefined(typeof(PersistlyAccountMode), PersistlyAccountMode.AnonymousFirst), Is.True);
             Assert.That(Enum.IsDefined(typeof(PersistlyAccountMode), PersistlyAccountMode.AuthRequired), Is.True);
-            Assert.That(Enum.IsDefined(typeof(PersistlyAuthProvider), PersistlyAuthProvider.Google), Is.True);
-            Assert.That(Enum.IsDefined(typeof(PersistlyAuthProvider), PersistlyAuthProvider.OidcJwt), Is.True);
+            Assert.That(Enum.IsDefined(typeof(PersistlyAuthProvider), PersistlyAuthProvider.Firebase), Is.True);
+            Assert.That(Enum.GetNames(typeof(PersistlyAuthProvider)), Is.EqualTo(new[] { "Firebase" }));
         }
 
         [Test]
@@ -467,10 +467,10 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
-        public async Task SignInWithGoogleIdTokenStoresReturnedAccountSession()
+        public async Task SignInWithFirebaseTokenStoresReturnedAccountSession()
         {
             var transport = new QueueTransport(
-                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_auth\",\"accountSessionToken\":\"pst_auth_session\",\"isNewAccount\":true,\"linkedProvider\":\"google\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_auth\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{\"diamonds\":9},\"slots\":[]},\"version\":1,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"));
+                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_auth\",\"accountSessionToken\":\"pst_auth_session\",\"isNewAccount\":true,\"linkedProvider\":\"firebase\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_auth\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{\"diamonds\":9},\"slots\":[]},\"version\":1,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"));
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
             {
                 PlayerRef = "player-184",
@@ -478,21 +478,21 @@ namespace Persistly.Unity.LastBeacon.Tests
                 Transport = transport
             });
 
-            var result = await PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync("google-id-token", new PersistlyAuthOptions { DeviceLabel = "Unity Editor" });
+            var result = await PersistlyGameSaves.Shared.SignInWithFirebaseTokenAsync("firebase-id-token", new PersistlyAuthOptions { DeviceLabel = "Unity Editor" });
             var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
             var account = PersistlyGameSaves.Shared.InspectAccount();
 
             Assert.That(result.AccountId, Is.EqualTo("acc_auth"));
             Assert.That(result.AccountSessionToken, Is.EqualTo("pst_auth_session"));
-            Assert.That(result.LinkedProvider, Is.EqualTo(PersistlyAuthProvider.Google));
+            Assert.That(result.LinkedProvider, Is.EqualTo(PersistlyAuthProvider.Firebase));
             Assert.That(result.IsNewAccount, Is.True);
             Assert.That(result.WasProviderNewForAccount, Is.True);
             Assert.That(session.AccountId, Is.EqualTo("acc_auth"));
             Assert.That(session.AccountSessionToken, Is.EqualTo("pst_auth_session"));
             Assert.That(account.AccountDataJson, Does.Contain("\"diamonds\":9"));
             Assert.That(transport.Requests[0].Url, Does.EndWith("/api/v1/accounts/auth/session"));
-            Assert.That(transport.Requests[0].Body, Does.Contain("\"provider\":\"google\""));
-            Assert.That(transport.Requests[0].Body, Does.Contain("\"token\":\"google-id-token\""));
+            Assert.That(transport.Requests[0].Body, Does.Contain("\"provider\":\"firebase\""));
+            Assert.That(transport.Requests[0].Body, Does.Contain("\"token\":\"firebase-id-token\""));
             Assert.That(transport.Requests[0].Body, Does.Contain("\"deviceLabel\":\"Unity Editor\""));
         }
 
@@ -500,8 +500,8 @@ namespace Persistly.Unity.LastBeacon.Tests
         public async Task LinkProviderSendsCurrentAccountSessionAndListProvidersParsesSafeList()
         {
             var transport = new QueueTransport(
-                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_refreshed\",\"isNewAccount\":false,\"linkedProvider\":\"oidc_jwt\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_account\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[]},\"version\":2,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"}}"),
-                new PersistlyTransportResponse(200, "[{\"provider\":\"google\",\"display\":{\"label\":\"Google\",\"emailHint\":\"a***@gmail.com\"},\"linkedAt\":\"2026-06-06T00:00:00Z\"},{\"provider\":\"oidc_jwt\",\"display\":{\"label\":\"Studio Login\"},\"linkedAt\":\"2026-06-06T00:01:00Z\"}]"));
+                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_refreshed\",\"isNewAccount\":false,\"linkedProvider\":\"firebase\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_account\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[]},\"version\":2,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"}}"),
+                new PersistlyTransportResponse(200, "[{\"provider\":\"firebase\",\"display\":{\"label\":\"Firebase\",\"emailHint\":\"a***@example.com\"},\"linkedAt\":\"2026-06-06T00:00:00Z\"}]"));
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
             {
                 PlayerRef = "player-184",
@@ -510,20 +510,19 @@ namespace Persistly.Unity.LastBeacon.Tests
                 Transport = transport
             });
 
-            var linked = await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.OidcJwt, "jwt-token")
+            var linked = await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, "firebase-id-token")
             {
                 DeviceLabel = "Editor"
             });
             var providers = await PersistlyGameSaves.Shared.ListLinkedProvidersAsync();
             var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
 
-            Assert.That(linked.LinkedProvider, Is.EqualTo(PersistlyAuthProvider.OidcJwt));
+            Assert.That(linked.LinkedProvider, Is.EqualTo(PersistlyAuthProvider.Firebase));
             Assert.That(session.AccountSessionToken, Is.EqualTo("pst_refreshed"));
-            Assert.That(providers.Count, Is.EqualTo(2));
-            Assert.That(providers[0].Provider, Is.EqualTo(PersistlyAuthProvider.Google));
-            Assert.That(providers[0].Display.Label, Is.EqualTo("Google"));
-            Assert.That(providers[0].Display.EmailHint, Is.EqualTo("a***@gmail.com"));
-            Assert.That(providers[1].Provider, Is.EqualTo(PersistlyAuthProvider.OidcJwt));
+            Assert.That(providers.Count, Is.EqualTo(1));
+            Assert.That(providers[0].Provider, Is.EqualTo(PersistlyAuthProvider.Firebase));
+            Assert.That(providers[0].Display.Label, Is.EqualTo("Firebase"));
+            Assert.That(providers[0].Display.EmailHint, Is.EqualTo("a***@example.com"));
             Assert.That(transport.Requests[0].Headers["X-Persistly-Account-ID"], Is.EqualTo("acc_account"));
             Assert.That(transport.Requests[0].Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_account_session"));
             Assert.That(transport.Requests[1].Headers["X-Persistly-Account-ID"], Is.EqualTo("acc_account"));
@@ -535,7 +534,7 @@ namespace Persistly.Unity.LastBeacon.Tests
         public async Task SignedInAuthRequiredSaveUsesStoredSessionForCloudSync()
         {
             var transport = new QueueTransport(
-                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_auth\",\"accountSessionToken\":\"pst_auth_session\",\"isNewAccount\":true,\"linkedProvider\":\"google\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_auth\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[]},\"version\":1,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"),
+                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_auth\",\"accountSessionToken\":\"pst_auth_session\",\"isNewAccount\":true,\"linkedProvider\":\"firebase\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_auth\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[]},\"version\":1,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"),
                 new PersistlyTransportResponse(201, "{\"accountId\":\"acc_auth\",\"account\":{\"runtimeId\":\"acc_auth\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[{\"slotId\":\"autosave\",\"slotInfo\":{}}]},\"version\":2,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:01:00Z\"},\"slot\":{\"runtimeId\":\"autosave\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"Level\":3,\"Gold\":30},\"version\":1,\"createdAt\":\"2026-06-06T00:01:00Z\",\"updatedAt\":\"2026-06-06T00:01:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"));
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
             {
@@ -545,7 +544,7 @@ namespace Persistly.Unity.LastBeacon.Tests
                 SyncPolicy = new PersistlySyncPolicy(60, 0, true, true, true, 25)
             });
 
-            await PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync("google-id-token");
+            await PersistlyGameSaves.Shared.SignInWithFirebaseTokenAsync("firebase-id-token");
             await PersistlyGameSaves.Shared.SaveDataAsync(new TestSaveState { Level = 3, Gold = 30 });
             var synced = await PersistlyGameSaves.Shared.ForceSyncDataAsync(new PersistlySyncOptions { BypassCooldown = true });
 

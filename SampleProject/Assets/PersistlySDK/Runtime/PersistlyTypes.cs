@@ -13,8 +13,7 @@ namespace Persistly.Unity
 
     public enum PersistlyAuthProvider
     {
-        Google,
-        OidcJwt
+        Firebase
     }
 
     public sealed class PersistlyClientOptions

@@ -677,17 +677,17 @@ namespace Persistly.Unity
             return new PersistlyGameSaveResult(PersistlyGameSaveTarget.Account, PersistlyGameSaveStatus.Synced);
         }
 
-        public Task<PersistlyAuthSessionResult> SignInWithGoogleIdTokenAsync(
-            string idToken,
+        public Task<PersistlyAuthSessionResult> SignInWithFirebaseTokenAsync(
+            string firebaseIdToken,
             PersistlyAuthOptions? options = null,
             CancellationToken cancellationToken = default)
         {
-            if (string.IsNullOrWhiteSpace(idToken))
+            if (string.IsNullOrWhiteSpace(firebaseIdToken))
             {
-                throw new PersistlyConfigurationError("sign_in_google_invalid_input: SignInWithGoogleIdTokenAsync requires a non-empty idToken.");
+                throw new PersistlyConfigurationError("sign_in_firebase_invalid_input: SignInWithFirebaseTokenAsync requires a non-empty firebaseIdToken.");
             }
 
-            var request = new PersistlyProviderSignInRequest(PersistlyAuthProvider.Google, idToken)
+            var request = new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, firebaseIdToken)
             {
                 DeviceLabel = options?.DeviceLabel
             };

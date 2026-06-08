@@ -26,9 +26,9 @@ namespace Persistly.Templates.AuthRequired
             }
         }
 
-        public async Task SignInAndSyncAsync(string googleIdToken)
+        public async Task SignInAndSyncAsync(string firebaseIdToken)
         {
-            await _saves.SignInWithGoogleAsync(googleIdToken);
+            await _saves.SignInWithFirebaseAsync(firebaseIdToken);
             await _saves.SyncAsync();
         }
 

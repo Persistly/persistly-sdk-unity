@@ -3,7 +3,7 @@ using UnityEngine;
 
 namespace Persistly.Unity.Examples
 {
-    public sealed class AuthGoogleUsage : MonoBehaviour
+    public sealed class AuthFirebaseUsage : MonoBehaviour
     {
         [SerializeField] private string runtimeKey = "";
 
@@ -24,9 +24,9 @@ namespace Persistly.Unity.Examples
             });
         }
 
-        public async Task SignInAndSyncAsync(string googleIdToken)
+        public async Task SignInAndSyncAsync(string firebaseIdToken)
         {
-            await PersistlyGameSaves.Shared.SignInWithGoogleIdTokenAsync(googleIdToken, new PersistlyAuthOptions
+            await PersistlyGameSaves.Shared.SignInWithFirebaseTokenAsync(firebaseIdToken, new PersistlyAuthOptions
             {
                 DeviceLabel = SystemInfo.deviceName
             });
