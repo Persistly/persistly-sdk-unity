@@ -458,7 +458,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             var due = await PersistlyGameSaves.Shared.SyncDueSlotsAsync(new PersistlySyncOptions { IncludeSkipped = true });
             var loaded = await PersistlyGameSaves.Shared.LoadDataAsync<TestSaveState>();
 
-            Assert.That(saved.Status, Is.EqualTo(PersistlySlotStatus.AuthRequired));
+            Assert.That(saved.Status, Is.EqualTo(PersistlySlotStatus.LocalSaved));
             Assert.That(sync.Status, Is.EqualTo(PersistlySlotStatus.AuthRequired));
             Assert.That(due[0].Status, Is.EqualTo(PersistlySlotStatus.AuthRequired));
             Assert.That(loaded.Status, Is.EqualTo(PersistlySlotStatus.LocalFound));

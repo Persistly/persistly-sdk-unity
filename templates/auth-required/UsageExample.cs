@@ -14,13 +14,14 @@ namespace Persistly.Templates.AuthRequired
 
         public async Task SaveBeforeSignInAsync()
         {
-            var local = await _saves.SaveLocalAsync(new AuthRequiredSaveState
+            await _saves.SaveLocalAsync(new AuthRequiredSaveState
             {
                 Level = 1,
                 Coins = 50
             });
 
-            if (local.Status == Persistly.Unity.PersistlySlotStatus.AuthRequired)
+            var sync = await _saves.SyncAsync();
+            if (sync.Status == Persistly.Unity.PersistlySlotStatus.AuthRequired)
             {
                 ShowSignInPrompt();
             }

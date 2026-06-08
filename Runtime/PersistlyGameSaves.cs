@@ -953,10 +953,7 @@ namespace Persistly.Unity
                 SaveSlot(slot);
             }
 
-            var status = Settings.AccountMode == PersistlyAccountMode.AuthRequired && !HasAccountSession()
-                ? PersistlySlotStatus.AuthRequired
-                : PersistlySlotStatus.LocalSaved;
-            return Task.FromResult(new PersistlySlotResult(normalizedSlotId, status));
+            return Task.FromResult(new PersistlySlotResult(normalizedSlotId, PersistlySlotStatus.LocalSaved));
         }
 
         public Task<PersistlySlotResult<TState>> LoadSlotAsync<TState>(string slotId) where TState : class

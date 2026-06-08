@@ -105,7 +105,8 @@ var local = await PersistlyGameSaves.Shared.SaveDataAsync(new PlayerSaveState
     Level = 1
 });
 
-if (local.Status == PersistlySlotStatus.AuthRequired)
+var syncBeforeSignIn = await PersistlyGameSaves.Shared.ForceSyncDataAsync();
+if (syncBeforeSignIn.Status == PersistlySlotStatus.AuthRequired)
 {
     ShowSignInPrompt();
 }
@@ -121,7 +122,7 @@ await PersistlyGameSaves.Shared.SignInWithFirebaseTokenAsync(firebaseIdToken, ne
 await PersistlyGameSaves.Shared.ForceSyncDataAsync();
 ```
 
-In `AuthRequired` mode, local saves and loads still work before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a Firebase ID token is exchanged for a Persistly account session.
+In `AuthRequired` mode, local saves and loads still return local statuses before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a Firebase ID token is exchanged for a Persistly account session.
 
 Lower-level provider sign-in and provider linking are available for Firebase:
 
