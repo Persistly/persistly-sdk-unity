@@ -582,12 +582,19 @@ namespace Persistly.Unity.LastBeacon.Tests
         [Test]
         public void AuthBridgeErrorsAreTyped()
         {
+            const string safeMismatchMessage = "This Firebase token belongs to a different Firebase project than the one configured for this environment.";
+            const string providerToken = "firebase-secret-provider-token";
             var providerTokenInvalid = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"provider_token_invalid\",\"message\":\"Provider token is invalid.\"}}");
+            var firebaseProjectMismatch = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"firebase_project_mismatch\",\"message\":\"This Firebase token belongs to a different Firebase project than the one configured for this environment.\",\"retryable\":false}}");
             var providerNotConfigured = PersistlyClient.ParseErrorForTests(403, "{\"error\":{\"code\":\"auth_provider_not_configured\",\"message\":\"Auth provider is not configured.\"}}");
             var accountConflict = PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"account_auth_conflict\",\"message\":\"This identity is already linked.\",\"details\":{\"authenticatedAccount\":{\"hasSlots\":true,\"slotCount\":3}}}}");
 
             Assert.That(providerTokenInvalid, Is.TypeOf<PersistlyProviderTokenInvalidError>());
             Assert.That(providerTokenInvalid.Code, Is.EqualTo(PersistlyErrorCode.ProviderTokenInvalid));
+            Assert.That(firebaseProjectMismatch, Is.TypeOf<PersistlyFirebaseProjectMismatchError>());
+            Assert.That(firebaseProjectMismatch.Code, Is.EqualTo(PersistlyErrorCode.FirebaseProjectMismatch));
+            Assert.That(firebaseProjectMismatch.Message, Is.EqualTo(safeMismatchMessage));
+            Assert.That(firebaseProjectMismatch.ToString(), Does.Not.Contain(providerToken));
             Assert.That(providerNotConfigured, Is.TypeOf<PersistlyAuthProviderNotConfiguredError>());
             Assert.That(providerNotConfigured.Code, Is.EqualTo(PersistlyErrorCode.AuthProviderNotConfigured));
             Assert.That(accountConflict, Is.TypeOf<PersistlyAccountAuthConflictError>());

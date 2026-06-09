@@ -1272,6 +1272,11 @@ namespace Persistly.Unity
                         return new PersistlyProviderTokenInvalidError(statusCode, message, detailsJson);
                     }
 
+                    if (code == PersistlyErrorCode.FirebaseProjectMismatch)
+                    {
+                        return new PersistlyFirebaseProjectMismatchError(statusCode, message, detailsJson);
+                    }
+
                     if (code == PersistlyErrorCode.AuthProviderNotConfigured)
                     {
                         return new PersistlyAuthProviderNotConfiguredError(statusCode, message, detailsJson);
@@ -1326,6 +1331,8 @@ namespace Persistly.Unity
                     return new PersistlyTransferCodeDisabledError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.ProviderTokenInvalid:
                     return new PersistlyProviderTokenInvalidError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.FirebaseProjectMismatch:
+                    return new PersistlyFirebaseProjectMismatchError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.AuthProviderNotConfigured:
                     return new PersistlyAuthProviderNotConfiguredError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.AccountAuthConflict:
@@ -1376,6 +1383,8 @@ namespace Persistly.Unity
                     return PersistlyErrorCode.TransferCodeDisabled;
                 case "provider_token_invalid":
                     return PersistlyErrorCode.ProviderTokenInvalid;
+                case "firebase_project_mismatch":
+                    return PersistlyErrorCode.FirebaseProjectMismatch;
                 case "auth_provider_not_configured":
                     return PersistlyErrorCode.AuthProviderNotConfigured;
                 case "account_auth_conflict":

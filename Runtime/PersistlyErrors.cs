@@ -23,6 +23,7 @@ namespace Persistly.Unity
         TransferCodeRateLimited,
         TransferCodeDisabled,
         ProviderTokenInvalid,
+        FirebaseProjectMismatch,
         AuthProviderNotConfigured,
         AccountAuthConflict,
         ServerError
@@ -244,6 +245,14 @@ namespace Persistly.Unity
     {
         public PersistlyProviderTokenInvalidError(int statusCode, string message, string? detailsJson = null)
             : base(statusCode, PersistlyErrorCode.ProviderTokenInvalid, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyFirebaseProjectMismatchError : PersistlyApiError
+    {
+        public PersistlyFirebaseProjectMismatchError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.FirebaseProjectMismatch, message, detailsJson)
         {
         }
     }
