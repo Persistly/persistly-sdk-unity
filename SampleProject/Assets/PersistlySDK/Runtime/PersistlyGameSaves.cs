@@ -694,6 +694,23 @@ namespace Persistly.Unity
             return SignInWithProviderAsync(request, cancellationToken);
         }
 
+        public Task<PersistlyAuthSessionResult> SignInWithSupabaseTokenAsync(
+            string supabaseAccessToken,
+            PersistlyAuthOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(supabaseAccessToken))
+            {
+                throw new PersistlyConfigurationError("sign_in_supabase_invalid_input: SignInWithSupabaseTokenAsync requires a non-empty supabaseAccessToken.");
+            }
+
+            var request = new PersistlyProviderSignInRequest(PersistlyAuthProvider.Supabase, supabaseAccessToken)
+            {
+                DeviceLabel = options?.DeviceLabel
+            };
+            return SignInWithProviderAsync(request, cancellationToken);
+        }
+
         public async Task<PersistlyAuthSessionResult> SignInWithProviderAsync(
             PersistlyProviderSignInRequest request,
             CancellationToken cancellationToken = default)

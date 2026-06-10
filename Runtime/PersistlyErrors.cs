@@ -24,6 +24,8 @@ namespace Persistly.Unity
         TransferCodeDisabled,
         ProviderTokenInvalid,
         FirebaseProjectMismatch,
+        SupabaseProjectMismatch,
+        SupabaseAudienceMismatch,
         AuthProviderNotConfigured,
         AccountAuthConflict,
         ServerError
@@ -253,6 +255,22 @@ namespace Persistly.Unity
     {
         public PersistlyFirebaseProjectMismatchError(int statusCode, string message, string? detailsJson = null)
             : base(statusCode, PersistlyErrorCode.FirebaseProjectMismatch, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlySupabaseProjectMismatchError : PersistlyApiError
+    {
+        public PersistlySupabaseProjectMismatchError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.SupabaseProjectMismatch, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlySupabaseAudienceMismatchError : PersistlyApiError
+    {
+        public PersistlySupabaseAudienceMismatchError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.SupabaseAudienceMismatch, message, detailsJson)
         {
         }
     }

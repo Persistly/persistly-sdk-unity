@@ -13,7 +13,8 @@ namespace Persistly.Unity
 
     public enum PersistlyAuthProvider
     {
-        Firebase
+        Firebase,
+        Supabase
     }
 
     public sealed class PersistlyClientOptions

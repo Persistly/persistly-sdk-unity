@@ -33,6 +33,12 @@ namespace Persistly.Templates.AuthRequired
             await _saves.SyncAsync();
         }
 
+        public async Task SignInWithSupabaseAndSyncAsync(string supabaseAccessToken)
+        {
+            await _saves.SignInWithSupabaseAsync(supabaseAccessToken);
+            await _saves.SyncAsync();
+        }
+
         public Task SignOutAsync()
         {
             return _saves.SignOutAsync();

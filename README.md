@@ -18,7 +18,7 @@ The recommended Unity flow is facade-first:
 2. For one-save games, use `SaveDataAsync` and `LoadDataAsync`.
 3. For manual saves or slots, use named slots through `SaveSlotAsync` and `LoadSlotAsync`.
 4. Call `ForceSyncDataAsync`, `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueAccountAsync` from explicit lifecycle/safe-sync points.
-5. Optional auth bridge helpers can exchange Firebase ID tokens for a Persistly account session.
+5. Optional auth bridge helpers can exchange Firebase ID tokens or Supabase access tokens for a Persistly account session.
 6. Use `PersistlyClient` directly only for advanced runtime API access.
 
 This package is `1.0.0` and pins `persistly-contract-v0.4.0`.
@@ -88,7 +88,7 @@ public sealed class PlayerSaveState
 
 ## Account Modes And Auth Bridge
 
-`AnonymousFirst` is the default account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous remote account on the first cloud sync, then link Firebase later.
+`AnonymousFirst` is the default account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous remote account on the first cloud sync, then link Firebase or Supabase later.
 
 Use `AuthRequired` when your game requires sign-in before cloud sync:
 
@@ -122,9 +122,23 @@ await PersistlyGameSaves.Shared.SignInWithFirebaseTokenAsync(firebaseIdToken, ne
 await PersistlyGameSaves.Shared.ForceSyncDataAsync();
 ```
 
-In `AuthRequired` mode, local saves and loads still return local statuses before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a Firebase ID token is exchanged for a Persistly account session.
+For Supabase, configure the Supabase provider in the Persistly dashboard with the project URL for the same environment, then pass the current Supabase access token:
 
-Lower-level provider sign-in and provider linking are available for Firebase:
+```csharp
+// Get the Supabase access token from your Supabase client session.
+var supabaseAccessToken = supabaseSession.AccessToken;
+
+await PersistlyGameSaves.Shared.SignInWithSupabaseTokenAsync(supabaseAccessToken, new PersistlyAuthOptions
+{
+    DeviceLabel = SystemInfo.deviceName
+});
+
+await PersistlyGameSaves.Shared.ForceSyncDataAsync();
+```
+
+In `AuthRequired` mode, local saves and loads still return local statuses before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a Firebase ID token or Supabase access token is exchanged for a Persistly account session.
+
+Lower-level provider sign-in and provider linking are available for Firebase and Supabase:
 
 ```csharp
 await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, firebaseIdToken)
@@ -132,7 +146,12 @@ await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSig
     DeviceLabel = SystemInfo.deviceName
 });
 
-await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, firebaseIdToken));
+await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Supabase, supabaseAccessToken)
+{
+    DeviceLabel = SystemInfo.deviceName
+});
+
+await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Supabase, supabaseAccessToken));
 
 var providers = await PersistlyGameSaves.Shared.ListLinkedProvidersAsync();
 await PersistlyGameSaves.Shared.SignOutAsync();
@@ -235,7 +254,7 @@ Account data sync preserves server-owned `slots`; it never rewrites slot referen
 - `templates/one-save` for idle, casual, and one-save games.
 - `templates/multi-slot` for manual saves, campaigns, and slot select screens.
 - `templates/account-slots` for games with sign-in or cross-device restore.
-- `templates/auth-required` for games that require Firebase sign-in before cloud sync.
+- `templates/auth-required` for games that require Firebase or Supabase sign-in before cloud sync.
 
 ## Slots And Conflicts
 
@@ -281,7 +300,7 @@ Conflicts keep local and cloud data separate. Local gameplay data is never overw
 - `ListLinkedProvidersAsync`
 - typed `slot_already_exists` and `slot_archived` errors
 - typed transfer-code errors such as `transfer_code_invalid`, `transfer_code_expired`, and `transfer_code_consumed`
-- typed auth bridge errors such as `provider_token_invalid`, `auth_provider_not_configured`, and `account_auth_conflict`
+- typed auth bridge errors such as `provider_token_invalid`, `supabase_token_invalid`, `auth_provider_not_configured`, and `account_auth_conflict`
 
 Account slot requests send `slotId`, `slotInfo`, and `data` directly. Public account and slot responses do not expose internal runtime ids.
 
@@ -345,5 +364,6 @@ Release slotInfo lives in `UPM_RELEASE.md`.
 
 - `examples/MinimalUsage.cs` for a minimal facade-first snippet
 - `examples/AuthFirebaseUsage.cs` for a Firebase Auth Bridge snippet
+- `examples/AuthSupabaseUsage.cs` for a Supabase Auth Bridge snippet
 - `SampleProject/Assets/LastBeacon/` for the playable endless-idle sample
 - `SampleProject/Assets/Scenes/LastBeacon.unity` for the generated demo scene

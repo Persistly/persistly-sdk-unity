@@ -19,3 +19,4 @@ Runtime delete helpers also exist on same facade:
 Auth-specific examples are separate from the minimal flow:
 
 - `AuthFirebaseUsage.cs` shows `AuthRequired` mode with Firebase ID token sign-in.
+- `AuthSupabaseUsage.cs` shows `AuthRequired` mode with Supabase access token sign-in.

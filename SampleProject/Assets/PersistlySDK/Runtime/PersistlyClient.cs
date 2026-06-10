@@ -1277,6 +1277,16 @@ namespace Persistly.Unity
                         return new PersistlyFirebaseProjectMismatchError(statusCode, message, detailsJson);
                     }
 
+                    if (code == PersistlyErrorCode.SupabaseProjectMismatch)
+                    {
+                        return new PersistlySupabaseProjectMismatchError(statusCode, message, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.SupabaseAudienceMismatch)
+                    {
+                        return new PersistlySupabaseAudienceMismatchError(statusCode, message, detailsJson);
+                    }
+
                     if (code == PersistlyErrorCode.AuthProviderNotConfigured)
                     {
                         return new PersistlyAuthProviderNotConfiguredError(statusCode, message, detailsJson);
@@ -1333,6 +1343,10 @@ namespace Persistly.Unity
                     return new PersistlyProviderTokenInvalidError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.FirebaseProjectMismatch:
                     return new PersistlyFirebaseProjectMismatchError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.SupabaseProjectMismatch:
+                    return new PersistlySupabaseProjectMismatchError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.SupabaseAudienceMismatch:
+                    return new PersistlySupabaseAudienceMismatchError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.AuthProviderNotConfigured:
                     return new PersistlyAuthProviderNotConfiguredError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.AccountAuthConflict:
@@ -1382,10 +1396,24 @@ namespace Persistly.Unity
                 case "transfer_code_disabled":
                     return PersistlyErrorCode.TransferCodeDisabled;
                 case "provider_token_invalid":
+                case "firebase_token_invalid":
+                case "firebase_token_expired":
+                case "supabase_token_missing":
+                case "supabase_token_invalid":
+                case "supabase_token_expired":
                     return PersistlyErrorCode.ProviderTokenInvalid;
                 case "firebase_project_mismatch":
                     return PersistlyErrorCode.FirebaseProjectMismatch;
+                case "supabase_project_mismatch":
+                    return PersistlyErrorCode.SupabaseProjectMismatch;
+                case "supabase_audience_mismatch":
+                    return PersistlyErrorCode.SupabaseAudienceMismatch;
                 case "auth_provider_not_configured":
+                case "provider_not_configured":
+                case "provider_not_enabled":
+                case "provider_not_supported":
+                case "supabase_project_url_required":
+                case "supabase_project_url_invalid":
                     return PersistlyErrorCode.AuthProviderNotConfigured;
                 case "account_auth_conflict":
                     return PersistlyErrorCode.AccountAuthConflict;
@@ -1457,8 +1485,10 @@ namespace Persistly.Unity
             {
                 case PersistlyAuthProvider.Firebase:
                     return "firebase";
+                case PersistlyAuthProvider.Supabase:
+                    return "supabase";
                 default:
-                    throw new PersistlyConfigurationError("Unknown auth provider: " + provider + ".");
+                    throw new PersistlyConfigurationError("Auth provider must be firebase or supabase.");
             }
         }
 
@@ -1468,8 +1498,10 @@ namespace Persistly.Unity
             {
                 case "firebase":
                     return PersistlyAuthProvider.Firebase;
+                case "supabase":
+                    return PersistlyAuthProvider.Supabase;
                 default:
-                    throw new PersistlyConfigurationError("Unknown auth provider: " + provider + ".");
+                    throw new PersistlyConfigurationError("Auth provider must be firebase or supabase.");
             }
         }
 
