@@ -531,6 +531,34 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
+        public async Task LinkProviderConflictKeepsCurrentAccountSession()
+        {
+            var transport = new QueueTransport(
+                new PersistlyTransportResponse(409, "{\"error\":{\"code\":\"account_auth_conflict\",\"message\":\"This identity is already linked to another account.\",\"details\":{\"authenticatedAccount\":{\"hasSlots\":true,\"slotCount\":3}}}}"));
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                AccountId = "acc_current",
+                AccountSessionToken = "pst_current_session",
+                Transport = transport
+            });
+
+            var error = Assert.ThrowsAsync<PersistlyAccountAuthConflictError>(() =>
+                PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, "firebase-id-token")
+                {
+                    DeviceLabel = "Editor"
+                }));
+            var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
+
+            Assert.That(error.Code, Is.EqualTo(PersistlyErrorCode.AccountAuthConflict));
+            Assert.That(session.AccountId, Is.EqualTo("acc_current"));
+            Assert.That(session.AccountSessionToken, Is.EqualTo("pst_current_session"));
+            Assert.That(transport.Requests[0].Url, Does.EndWith("/api/v1/accounts/auth/session"));
+            Assert.That(transport.Requests[0].Headers["X-Persistly-Account-ID"], Is.EqualTo("acc_current"));
+            Assert.That(transport.Requests[0].Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_current_session"));
+        }
+
+        [Test]
         public async Task SignedInAuthRequiredSaveUsesStoredSessionForCloudSync()
         {
             var transport = new QueueTransport(
