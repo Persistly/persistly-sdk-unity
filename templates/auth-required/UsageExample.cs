@@ -39,6 +39,12 @@ namespace Persistly.Templates.AuthRequired
             await _saves.SyncAsync();
         }
 
+        public async Task SignInWithAuth0AndSyncAsync(string auth0Token)
+        {
+            await _saves.SignInWithAuth0Async(auth0Token);
+            await _saves.SyncAsync();
+        }
+
         public Task SignOutAsync()
         {
             return _saves.SignOutAsync();

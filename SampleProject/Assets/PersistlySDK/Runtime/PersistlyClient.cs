@@ -1287,6 +1287,16 @@ namespace Persistly.Unity
                         return new PersistlySupabaseAudienceMismatchError(statusCode, message, detailsJson);
                     }
 
+                    if (code == PersistlyErrorCode.Auth0IssuerMismatch)
+                    {
+                        return new PersistlyAuth0IssuerMismatchError(statusCode, message, detailsJson);
+                    }
+
+                    if (code == PersistlyErrorCode.Auth0AudienceMismatch)
+                    {
+                        return new PersistlyAuth0AudienceMismatchError(statusCode, message, detailsJson);
+                    }
+
                     if (code == PersistlyErrorCode.AuthProviderNotConfigured)
                     {
                         return new PersistlyAuthProviderNotConfiguredError(statusCode, message, detailsJson);
@@ -1347,6 +1357,10 @@ namespace Persistly.Unity
                     return new PersistlySupabaseProjectMismatchError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.SupabaseAudienceMismatch:
                     return new PersistlySupabaseAudienceMismatchError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.Auth0IssuerMismatch:
+                    return new PersistlyAuth0IssuerMismatchError(statusCode, message, detailsJson);
+                case PersistlyErrorCode.Auth0AudienceMismatch:
+                    return new PersistlyAuth0AudienceMismatchError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.AuthProviderNotConfigured:
                     return new PersistlyAuthProviderNotConfiguredError(statusCode, message, detailsJson);
                 case PersistlyErrorCode.AccountAuthConflict:
@@ -1401,6 +1415,9 @@ namespace Persistly.Unity
                 case "supabase_token_missing":
                 case "supabase_token_invalid":
                 case "supabase_token_expired":
+                case "auth0_token_missing":
+                case "auth0_token_invalid":
+                case "auth0_token_expired":
                     return PersistlyErrorCode.ProviderTokenInvalid;
                 case "firebase_project_mismatch":
                     return PersistlyErrorCode.FirebaseProjectMismatch;
@@ -1408,12 +1425,18 @@ namespace Persistly.Unity
                     return PersistlyErrorCode.SupabaseProjectMismatch;
                 case "supabase_audience_mismatch":
                     return PersistlyErrorCode.SupabaseAudienceMismatch;
+                case "auth0_issuer_mismatch":
+                    return PersistlyErrorCode.Auth0IssuerMismatch;
+                case "auth0_audience_mismatch":
+                    return PersistlyErrorCode.Auth0AudienceMismatch;
                 case "auth_provider_not_configured":
                 case "provider_not_configured":
                 case "provider_not_enabled":
                 case "provider_not_supported":
                 case "supabase_project_url_required":
                 case "supabase_project_url_invalid":
+                case "auth0_domain_required":
+                case "auth0_domain_invalid":
                     return PersistlyErrorCode.AuthProviderNotConfigured;
                 case "account_auth_conflict":
                     return PersistlyErrorCode.AccountAuthConflict;
@@ -1487,8 +1510,10 @@ namespace Persistly.Unity
                     return "firebase";
                 case PersistlyAuthProvider.Supabase:
                     return "supabase";
+                case PersistlyAuthProvider.Auth0:
+                    return "auth0";
                 default:
-                    throw new PersistlyConfigurationError("Auth provider must be firebase or supabase.");
+                    throw new PersistlyConfigurationError("Auth provider must be firebase, supabase, or auth0.");
             }
         }
 
@@ -1500,8 +1525,10 @@ namespace Persistly.Unity
                     return PersistlyAuthProvider.Firebase;
                 case "supabase":
                     return PersistlyAuthProvider.Supabase;
+                case "auth0":
+                    return PersistlyAuthProvider.Auth0;
                 default:
-                    throw new PersistlyConfigurationError("Auth provider must be firebase or supabase.");
+                    throw new PersistlyConfigurationError("Auth provider must be firebase, supabase, or auth0.");
             }
         }
 

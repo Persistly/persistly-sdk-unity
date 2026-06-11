@@ -26,6 +26,8 @@ namespace Persistly.Unity
         FirebaseProjectMismatch,
         SupabaseProjectMismatch,
         SupabaseAudienceMismatch,
+        Auth0IssuerMismatch,
+        Auth0AudienceMismatch,
         AuthProviderNotConfigured,
         AccountAuthConflict,
         ServerError
@@ -271,6 +273,22 @@ namespace Persistly.Unity
     {
         public PersistlySupabaseAudienceMismatchError(int statusCode, string message, string? detailsJson = null)
             : base(statusCode, PersistlyErrorCode.SupabaseAudienceMismatch, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyAuth0IssuerMismatchError : PersistlyApiError
+    {
+        public PersistlyAuth0IssuerMismatchError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.Auth0IssuerMismatch, message, detailsJson)
+        {
+        }
+    }
+
+    public sealed class PersistlyAuth0AudienceMismatchError : PersistlyApiError
+    {
+        public PersistlyAuth0AudienceMismatchError(int statusCode, string message, string? detailsJson = null)
+            : base(statusCode, PersistlyErrorCode.Auth0AudienceMismatch, message, detailsJson)
         {
         }
     }

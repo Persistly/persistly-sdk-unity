@@ -18,7 +18,7 @@ The recommended Unity flow is facade-first:
 2. For one-save games, use `SaveDataAsync` and `LoadDataAsync`.
 3. For manual saves or slots, use named slots through `SaveSlotAsync` and `LoadSlotAsync`.
 4. Call `ForceSyncDataAsync`, `ForceSyncAsync`, `SyncDueSlotsAsync`, or `SyncDueAccountAsync` from explicit lifecycle/safe-sync points.
-5. Optional auth bridge helpers can exchange Firebase ID tokens or Supabase access tokens for a Persistly account session.
+5. Optional auth bridge helpers can exchange Firebase ID tokens, Supabase access tokens, or Auth0 ID/access tokens for a Persistly account session.
 6. Use `PersistlyClient` directly only for advanced runtime API access.
 
 This package is `1.0.0` and pins `persistly-contract-v0.4.0`.
@@ -88,7 +88,7 @@ public sealed class PlayerSaveState
 
 ## Account Modes And Auth Bridge
 
-`AnonymousFirst` is the default account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous remote account on the first cloud sync, then link Firebase or Supabase later.
+`AnonymousFirst` is the default account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous remote account on the first cloud sync, then link Firebase, Supabase, or Auth0 later.
 
 Use `AuthRequired` when your game requires sign-in before cloud sync:
 
@@ -136,9 +136,23 @@ await PersistlyGameSaves.Shared.SignInWithSupabaseTokenAsync(supabaseAccessToken
 await PersistlyGameSaves.Shared.ForceSyncDataAsync();
 ```
 
-In `AuthRequired` mode, local saves and loads still return local statuses before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a Firebase ID token or Supabase access token is exchanged for a Persistly account session.
+For Auth0, configure the Auth0 provider in the Persistly dashboard with the tenant domain for the same environment, then pass the current Auth0 ID token or configured-audience access token:
 
-Lower-level provider sign-in and provider linking are available for Firebase and Supabase:
+```csharp
+// Get the Auth0 token from the Auth0 SDK in your game.
+var auth0Token = await GetAuth0TokenFromYourAuth0ClientAsync();
+
+await PersistlyGameSaves.Shared.SignInWithAuth0TokenAsync(auth0Token, new PersistlyAuthOptions
+{
+    DeviceLabel = SystemInfo.deviceName
+});
+
+await PersistlyGameSaves.Shared.ForceSyncDataAsync();
+```
+
+In `AuthRequired` mode, local saves and loads still return local statuses before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a Firebase ID token, Supabase access token, or Auth0 token is exchanged for a Persistly account session.
+
+Lower-level provider sign-in and provider linking are available for Firebase, Supabase, and Auth0:
 
 ```csharp
 await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, firebaseIdToken)
@@ -147,6 +161,11 @@ await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSig
 });
 
 await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Supabase, supabaseAccessToken)
+{
+    DeviceLabel = SystemInfo.deviceName
+});
+
+await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Auth0, auth0Token)
 {
     DeviceLabel = SystemInfo.deviceName
 });
@@ -254,7 +273,7 @@ Account data sync preserves server-owned `slots`; it never rewrites slot referen
 - `templates/one-save` for idle, casual, and one-save games.
 - `templates/multi-slot` for manual saves, campaigns, and slot select screens.
 - `templates/account-slots` for games with sign-in or cross-device restore.
-- `templates/auth-required` for games that require Firebase or Supabase sign-in before cloud sync.
+- `templates/auth-required` for games that require Firebase, Supabase, or Auth0 sign-in before cloud sync.
 
 ## Slots And Conflicts
 

@@ -31,6 +31,14 @@ namespace Persistly.Templates.AuthRequired
             });
         }
 
+        public Task<PersistlyAuthSessionResult> SignInWithAuth0Async(string auth0Token)
+        {
+            return PersistlyGameSaves.Shared.SignInWithAuth0TokenAsync(auth0Token, new PersistlyAuthOptions
+            {
+                DeviceLabel = SystemInfo.deviceName
+            });
+        }
+
         public Task<PersistlySlotResult> SaveLocalAsync(AuthRequiredSaveState state)
         {
             return PersistlyGameSaves.Shared.SaveDataAsync(state);

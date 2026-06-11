@@ -35,7 +35,8 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(Enum.IsDefined(typeof(PersistlyAccountMode), PersistlyAccountMode.AuthRequired), Is.True);
             Assert.That(Enum.IsDefined(typeof(PersistlyAuthProvider), PersistlyAuthProvider.Firebase), Is.True);
             Assert.That(Enum.IsDefined(typeof(PersistlyAuthProvider), PersistlyAuthProvider.Supabase), Is.True);
-            Assert.That(Enum.GetNames(typeof(PersistlyAuthProvider)), Is.EqualTo(new[] { "Firebase", "Supabase" }));
+            Assert.That(Enum.IsDefined(typeof(PersistlyAuthProvider), PersistlyAuthProvider.Auth0), Is.True);
+            Assert.That(Enum.GetNames(typeof(PersistlyAuthProvider)), Is.EqualTo(new[] { "Firebase", "Supabase", "Auth0" }));
         }
 
         [Test]
@@ -526,11 +527,39 @@ namespace Persistly.Unity.LastBeacon.Tests
         }
 
         [Test]
+        public async Task SignInWithAuth0TokenStoresReturnedAccountSession()
+        {
+            var transport = new QueueTransport(
+                new PersistlyTransportResponse(200, "{\"accountId\":\"acc_auth0\",\"accountSessionToken\":\"pst_auth0_session\",\"isNewAccount\":true,\"linkedProvider\":\"auth0\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_auth0\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{\"diamonds\":15},\"slots\":[]},\"version\":1,\"createdAt\":\"2026-06-11T00:00:00Z\",\"updatedAt\":\"2026-06-11T00:00:00Z\"},\"syncPolicy\":{\"minRemoteSyncIntervalSeconds\":60,\"forceSyncCooldownSeconds\":0,\"syncOnAppBackground\":true,\"syncOnAppForeground\":true,\"syncOnReconnect\":true,\"maxQueuedLocalSnapshots\":25}}"));
+            await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
+            {
+                PlayerRef = "player-184",
+                AccountMode = PersistlyAccountMode.AuthRequired,
+                Transport = transport
+            });
+
+            var result = await PersistlyGameSaves.Shared.SignInWithAuth0TokenAsync("auth0-token", new PersistlyAuthOptions { DeviceLabel = "Unity Editor" });
+            var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
+            var account = PersistlyGameSaves.Shared.InspectAccount();
+
+            Assert.That(result.AccountId, Is.EqualTo("acc_auth0"));
+            Assert.That(result.AccountSessionToken, Is.EqualTo("pst_auth0_session"));
+            Assert.That(result.LinkedProvider, Is.EqualTo(PersistlyAuthProvider.Auth0));
+            Assert.That(session.AccountId, Is.EqualTo("acc_auth0"));
+            Assert.That(session.AccountSessionToken, Is.EqualTo("pst_auth0_session"));
+            Assert.That(account.AccountDataJson, Does.Contain("\"diamonds\":15"));
+            Assert.That(transport.Requests[0].Url, Does.EndWith("/api/v1/accounts/auth/session"));
+            Assert.That(transport.Requests[0].Body, Does.Contain("\"provider\":\"auth0\""));
+            Assert.That(transport.Requests[0].Body, Does.Contain("\"token\":\"auth0-token\""));
+            Assert.That(transport.Requests[0].Body, Does.Contain("\"deviceLabel\":\"Unity Editor\""));
+        }
+
+        [Test]
         public async Task LinkProviderSendsCurrentAccountSessionAndListProvidersParsesSafeList()
         {
             var transport = new QueueTransport(
                 new PersistlyTransportResponse(200, "{\"accountId\":\"acc_account\",\"accountSessionToken\":\"pst_refreshed\",\"isNewAccount\":false,\"linkedProvider\":\"supabase\",\"wasProviderNewForAccount\":true,\"account\":{\"runtimeId\":\"acc_account\",\"playerRef\":\"player-184\",\"slotInfo\":{},\"state\":{\"schema\":\"persistly.account.v1\",\"accountData\":{},\"slots\":[]},\"version\":2,\"createdAt\":\"2026-06-06T00:00:00Z\",\"updatedAt\":\"2026-06-06T00:00:00Z\"}}"),
-                new PersistlyTransportResponse(200, "[{\"provider\":\"firebase\",\"display\":{\"label\":\"Firebase\",\"emailHint\":\"a***@example.com\"},\"linkedAt\":\"2026-06-06T00:00:00Z\"},{\"provider\":\"supabase\",\"display\":{\"label\":\"Supabase\",\"emailHint\":\"s***@example.com\"},\"linkedAt\":\"2026-06-10T00:00:00Z\"}]"));
+                new PersistlyTransportResponse(200, "[{\"provider\":\"firebase\",\"display\":{\"label\":\"Firebase\",\"emailHint\":\"a***@example.com\"},\"linkedAt\":\"2026-06-06T00:00:00Z\"},{\"provider\":\"supabase\",\"display\":{\"label\":\"Supabase\",\"emailHint\":\"s***@example.com\"},\"linkedAt\":\"2026-06-10T00:00:00Z\"},{\"provider\":\"auth0\",\"display\":{\"label\":\"Auth0\",\"emailHint\":\"u***@example.com\"},\"linkedAt\":\"2026-06-11T00:00:00Z\"}]"));
             await PersistlyGameSaves.ConfigureAsync(new PersistlyGameSavesSettings("ps_test_example")
             {
                 PlayerRef = "player-184",
@@ -548,13 +577,16 @@ namespace Persistly.Unity.LastBeacon.Tests
 
             Assert.That(linked.LinkedProvider, Is.EqualTo(PersistlyAuthProvider.Supabase));
             Assert.That(session.AccountSessionToken, Is.EqualTo("pst_refreshed"));
-            Assert.That(providers.Count, Is.EqualTo(2));
+            Assert.That(providers.Count, Is.EqualTo(3));
             Assert.That(providers[0].Provider, Is.EqualTo(PersistlyAuthProvider.Firebase));
             Assert.That(providers[0].Display.Label, Is.EqualTo("Firebase"));
             Assert.That(providers[0].Display.EmailHint, Is.EqualTo("a***@example.com"));
             Assert.That(providers[1].Provider, Is.EqualTo(PersistlyAuthProvider.Supabase));
             Assert.That(providers[1].Display.Label, Is.EqualTo("Supabase"));
             Assert.That(providers[1].Display.EmailHint, Is.EqualTo("s***@example.com"));
+            Assert.That(providers[2].Provider, Is.EqualTo(PersistlyAuthProvider.Auth0));
+            Assert.That(providers[2].Display.Label, Is.EqualTo("Auth0"));
+            Assert.That(providers[2].Display.EmailHint, Is.EqualTo("u***@example.com"));
             Assert.That(transport.Requests[0].Body, Does.Contain("\"provider\":\"supabase\""));
             Assert.That(transport.Requests[0].Headers["X-Persistly-Account-ID"], Is.EqualTo("acc_account"));
             Assert.That(transport.Requests[0].Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_account_session"));
@@ -695,6 +727,9 @@ namespace Persistly.Unity.LastBeacon.Tests
             var supabaseTokenInvalid = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"supabase_token_invalid\",\"message\":\"Supabase access token is invalid.\"}}");
             var supabaseProjectMismatch = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"supabase_project_mismatch\",\"message\":\"Supabase token was issued by a different project.\"}}");
             var supabaseAudienceMismatch = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"supabase_audience_mismatch\",\"message\":\"Supabase token audience is not allowed.\"}}");
+            var auth0TokenInvalid = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"auth0_token_invalid\",\"message\":\"Auth0 token is invalid.\"}}");
+            var auth0IssuerMismatch = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"auth0_issuer_mismatch\",\"message\":\"Auth0 token issuer does not match this environment.\"}}");
+            var auth0AudienceMismatch = PersistlyClient.ParseErrorForTests(401, "{\"error\":{\"code\":\"auth0_audience_mismatch\",\"message\":\"Auth0 token audience is not allowed.\"}}");
             var providerNotConfigured = PersistlyClient.ParseErrorForTests(403, "{\"error\":{\"code\":\"auth_provider_not_configured\",\"message\":\"Auth provider is not configured.\"}}");
             var accountConflict = PersistlyClient.ParseErrorForTests(409, "{\"error\":{\"code\":\"account_auth_conflict\",\"message\":\"This identity is already linked.\",\"details\":{\"authenticatedAccount\":{\"hasSlots\":true,\"slotCount\":3}}}}");
 
@@ -710,6 +745,12 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(supabaseProjectMismatch.Code, Is.EqualTo(PersistlyErrorCode.SupabaseProjectMismatch));
             Assert.That(supabaseAudienceMismatch, Is.TypeOf<PersistlySupabaseAudienceMismatchError>());
             Assert.That(supabaseAudienceMismatch.Code, Is.EqualTo(PersistlyErrorCode.SupabaseAudienceMismatch));
+            Assert.That(auth0TokenInvalid, Is.TypeOf<PersistlyProviderTokenInvalidError>());
+            Assert.That(auth0TokenInvalid.Code, Is.EqualTo(PersistlyErrorCode.ProviderTokenInvalid));
+            Assert.That(auth0IssuerMismatch, Is.TypeOf<PersistlyAuth0IssuerMismatchError>());
+            Assert.That(auth0IssuerMismatch.Code, Is.EqualTo(PersistlyErrorCode.Auth0IssuerMismatch));
+            Assert.That(auth0AudienceMismatch, Is.TypeOf<PersistlyAuth0AudienceMismatchError>());
+            Assert.That(auth0AudienceMismatch.Code, Is.EqualTo(PersistlyErrorCode.Auth0AudienceMismatch));
             Assert.That(providerNotConfigured, Is.TypeOf<PersistlyAuthProviderNotConfiguredError>());
             Assert.That(providerNotConfigured.Code, Is.EqualTo(PersistlyErrorCode.AuthProviderNotConfigured));
             Assert.That(accountConflict, Is.TypeOf<PersistlyAccountAuthConflictError>());

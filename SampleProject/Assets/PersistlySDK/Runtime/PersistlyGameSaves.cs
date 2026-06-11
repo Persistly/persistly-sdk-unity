@@ -711,6 +711,23 @@ namespace Persistly.Unity
             return SignInWithProviderAsync(request, cancellationToken);
         }
 
+        public Task<PersistlyAuthSessionResult> SignInWithAuth0TokenAsync(
+            string auth0Token,
+            PersistlyAuthOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(auth0Token))
+            {
+                throw new PersistlyConfigurationError("sign_in_auth0_invalid_input: SignInWithAuth0TokenAsync requires a non-empty auth0Token.");
+            }
+
+            var request = new PersistlyProviderSignInRequest(PersistlyAuthProvider.Auth0, auth0Token)
+            {
+                DeviceLabel = options?.DeviceLabel
+            };
+            return SignInWithProviderAsync(request, cancellationToken);
+        }
+
         public async Task<PersistlyAuthSessionResult> SignInWithProviderAsync(
             PersistlyProviderSignInRequest request,
             CancellationToken cancellationToken = default)
