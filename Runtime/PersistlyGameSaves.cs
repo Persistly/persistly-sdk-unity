@@ -578,7 +578,7 @@ namespace Persistly.Unity
             var client = new PersistlyClient(new PersistlyClientOptions(settings.BaseUrl, settings.RuntimeKey.Trim())
             {
                 Transport = settings.Transport,
-                UserAgent = "Persistly Unity SDK/1.0.0"
+                UserAgent = "Persistly Unity SDK/1.1.0"
             });
 
             _shared = new PersistlyGameSaves(settings, client, store, localAccountKey, account);

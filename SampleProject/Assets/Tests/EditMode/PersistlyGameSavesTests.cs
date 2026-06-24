@@ -638,7 +638,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             var error = Assert.ThrowsAsync<PersistlyConfigurationError>(() =>
                 PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSignInRequest((PersistlyAuthProvider)999, "provider-token")));
 
-            Assert.That(error.Message, Does.Contain("firebase or supabase"));
+            Assert.That(error.Message, Does.Contain("firebase, supabase, or auth0"));
             Assert.That(transport.Requests.Count, Is.EqualTo(0));
         }
 
@@ -661,7 +661,7 @@ namespace Persistly.Unity.LastBeacon.Tests
                 var error = Assert.ThrowsAsync<PersistlyConfigurationError>(() =>
                     PersistlyGameSaves.Shared.ListLinkedProvidersAsync());
 
-                Assert.That(error.Message, Does.Contain("firebase or supabase"));
+                Assert.That(error.Message, Does.Contain("firebase, supabase, or auth0"));
             }
         }
 

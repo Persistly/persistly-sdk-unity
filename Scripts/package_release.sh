@@ -2,7 +2,7 @@
 set -euo pipefail
 
 DRY_RUN=0
-VERSION="1.0.0"
+VERSION="1.1.0"
 if [[ "${1:-}" == "--dry-run" ]]; then
   DRY_RUN=1
 elif [[ "${1:-}" != "" ]]; then

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.1.0
+
+- Adds Auth Bridge helpers for Firebase Auth, Supabase Auth, and Auth0.
+- Adds `AuthRequired` account mode so games can keep local saves before sign-in while cloud sync waits for a provider token exchange.
+- Adds provider sign-in, provider linking, linked-provider listing, and provider-specific error types.
+- Adds Auth Bridge examples/templates while keeping normal save/load/sync calls on Persistly account sessions.
+
 ## 1.0.0
 
 - First stable public Unity SDK release.
