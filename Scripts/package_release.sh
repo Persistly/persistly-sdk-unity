@@ -2,7 +2,7 @@
 set -euo pipefail
 
 DRY_RUN=0
-VERSION="1.1.0"
+VERSION="1.2.0"
 if [[ "${1:-}" == "--dry-run" ]]; then
   DRY_RUN=1
 elif [[ "${1:-}" != "" ]]; then
@@ -16,7 +16,7 @@ ARCHIVE_PATH="$DIST_DIR/persistly-unity-sdk-$VERSION.tgz"
 rm -rf "$STAGE_DIR" "$ARCHIVE_PATH"
 mkdir -p "$STAGE_DIR"
 
-for entry in assets Runtime contracts examples README.md CHANGELOG.md LICENSE SECURITY.md package.json UPM_RELEASE.md; do
+for entry in assets Runtime contracts examples templates README.md CHANGELOG.md LICENSE SECURITY.md package.json UPM_RELEASE.md; do
   cp -R "$ROOT_DIR/$entry" "$STAGE_DIR/$entry"
 done
 

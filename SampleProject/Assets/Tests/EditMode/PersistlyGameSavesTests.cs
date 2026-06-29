@@ -568,10 +568,7 @@ namespace Persistly.Unity.LastBeacon.Tests
                 Transport = transport
             });
 
-            var linked = await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Supabase, "supabase-access-token")
-            {
-                DeviceLabel = "Editor"
-            });
+            var linked = await PersistlyGameSaves.Shared.ConnectWithSupabaseTokenAsync("supabase-access-token", new PersistlyAuthOptions { DeviceLabel = "Editor" });
             var providers = await PersistlyGameSaves.Shared.ListLinkedProvidersAsync();
             var session = PersistlyGameSaves.Shared.GetAccountSession(includeToken: true);
 

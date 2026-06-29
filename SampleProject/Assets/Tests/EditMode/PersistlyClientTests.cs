@@ -92,7 +92,7 @@ namespace Persistly.Unity.LastBeacon.Tests
             Assert.That(transport.LastRequest.Url, Does.EndWith("/api/v1/accounts/acc_account/slots/autosave"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-Account-Session"], Is.EqualTo("pst_account_session"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-SDK"], Is.EqualTo("unity"));
-            Assert.That(transport.LastRequest.Headers["X-Persistly-SDK-Version"], Is.EqualTo("1.1.0"));
+            Assert.That(transport.LastRequest.Headers["X-Persistly-SDK-Version"], Is.EqualTo("1.2.0"));
             Assert.That(transport.LastRequest.Headers["X-Persistly-Platform"], Is.EqualTo("unity"));
         }
 

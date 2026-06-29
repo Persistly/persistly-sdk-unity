@@ -13,14 +13,14 @@ https://github.com/Persistly/persistly-sdk-unity.git?path=/
 Stable release tag:
 
 ```text
-https://github.com/Persistly/persistly-sdk-unity.git#v1.1.0
+https://github.com/Persistly/persistly-sdk-unity.git#v1.2.0
 ```
 
 ## Package
 
 - Name: `com.persistly.sdk.unity`
 - Display name: `Persistly Unity SDK`
-- Version: `1.1.0`
+- Version: `1.2.0`
 - Unity minimum: `2021.3`
 - License: `Apache-2.0`
 - Docs: `https://docs.persistly.app/sdk/unity`
@@ -31,25 +31,25 @@ https://github.com/Persistly/persistly-sdk-unity.git#v1.1.0
 Build a package archive:
 
 ```bash
-Scripts/package_release.sh 1.1.0
+Scripts/package_release.sh 1.2.0
 ```
 
 This creates:
 
 ```text
-dist/persistly-unity-sdk-1.1.0.tgz
+dist/persistly-unity-sdk-1.2.0.tgz
 ```
 
 Use the Git tag install URL as the primary public install path. Attach the `.tgz` to the GitHub release for users who want an archive.
 
 ## Pre-release Checklist
 
-- [ ] `package.json` version is `1.1.0`.
-- [ ] Runtime diagnostics send `X-Persistly-SDK-Version: 1.1.0`.
+- [ ] `package.json` version is `1.2.0`.
+- [ ] Runtime diagnostics send `X-Persistly-SDK-Version: 1.2.0`.
 - [ ] `python3 Scripts/validate_contract.py` passes.
 - [ ] Unity edit-mode tests pass.
 - [ ] Live smoke passes with a dev/test runtime key.
-- [ ] GitHub release/tag `v1.1.0` exists.
+- [ ] GitHub release/tag `v1.2.0` exists.
 - [ ] Release artifact is attached to GitHub release.
 
 ## Asset Store

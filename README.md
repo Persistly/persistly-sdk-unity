@@ -21,7 +21,7 @@ The recommended Unity flow is facade-first:
 5. Optional auth bridge helpers can exchange Firebase ID tokens, Supabase access tokens, or Auth0 ID/access tokens for a Persistly account session.
 6. Use `PersistlyClient` directly only for advanced runtime API access.
 
-This package is `1.1.0` and pins `persistly-contract-v0.4.0`.
+This package is `1.2.0` and pins `persistly-contract-v0.4.0`.
 
 ## Install
 
@@ -34,7 +34,7 @@ https://github.com/Persistly/persistly-sdk-unity.git?path=/
 For the stable release tag:
 
 ```text
-https://github.com/Persistly/persistly-sdk-unity.git#v1.1.0
+https://github.com/Persistly/persistly-sdk-unity.git#v1.2.0
 ```
 
 In Unity, open Package Manager, choose **Add package from git URL**, paste the URL, then configure a `ps_test_...` or `ps_live_...` runtime key in your game code or inspector.
@@ -88,7 +88,7 @@ public sealed class PlayerSaveState
 
 ## Account Modes And Auth Bridge
 
-`AnonymousFirst` is the default account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous remote account on the first cloud sync, then link Firebase, Supabase, or Auth0 later.
+`AnonymousFirst` is the default Persistly account mode. It preserves the simple local-first flow: the SDK can lazily create an anonymous Persistly account on the first cloud sync, then link Firebase, Supabase, or Auth0 later. It is not Firebase Anonymous Auth, Supabase anonymous sign-in, or an Auth0 guest user.
 
 Use `AuthRequired` when your game requires sign-in before cloud sync:
 
@@ -152,6 +152,21 @@ await PersistlyGameSaves.Shared.ForceSyncDataAsync();
 
 In `AuthRequired` mode, local saves and loads still return local statuses before sign-in. Cloud sync calls return `AuthRequired` and do not create an anonymous remote account until a Firebase ID token, Supabase access token, or Auth0 token is exchanged for a Persistly account session.
 
+For anonymous-first games, use the connect helpers when a player already has local or cloud progress and later connects a provider. The provider token comes from your game's Firebase, Supabase, or Auth0 SDK:
+
+```csharp
+await PersistlyGameSaves.Shared.ConnectWithFirebaseTokenAsync(firebaseIdToken, new PersistlyAuthOptions
+{
+    DeviceLabel = SystemInfo.deviceName
+});
+
+await PersistlyGameSaves.Shared.ConnectWithSupabaseTokenAsync(supabaseAccessToken);
+
+await PersistlyGameSaves.Shared.ConnectWithAuth0TokenAsync(auth0Token);
+```
+
+If the provider is already linked to another Persistly account, connect-later returns `account_auth_conflict` as `PersistlyAccountAuthConflictError` and preserves the current local anonymous progress. Do not automatically clear local data or switch accounts; show both choices in your game UI and continue saving locally until the player confirms.
+
 Lower-level provider sign-in and provider linking are available for Firebase, Supabase, and Auth0:
 
 ```csharp
@@ -171,6 +186,8 @@ await PersistlyGameSaves.Shared.SignInWithProviderAsync(new PersistlyProviderSig
 });
 
 await PersistlyGameSaves.Shared.LinkProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Supabase, supabaseAccessToken));
+
+await PersistlyGameSaves.Shared.ConnectProviderAsync(new PersistlyProviderSignInRequest(PersistlyAuthProvider.Auth0, auth0Token));
 
 var providers = await PersistlyGameSaves.Shared.ListLinkedProvidersAsync();
 await PersistlyGameSaves.Shared.SignOutAsync();
@@ -274,6 +291,7 @@ Account data sync preserves server-owned `slots`; it never rewrites slot referen
 - `templates/multi-slot` for manual saves, campaigns, and slot select screens.
 - `templates/account-slots` for games with sign-in or cross-device restore.
 - `templates/auth-required` for games that require Firebase, Supabase, or Auth0 sign-in before cloud sync.
+- `templates/anonymous-first-connect-later` for games that start anonymous, save first, and connect Firebase, Supabase, or Auth0 later.
 
 ## Slots And Conflicts
 
@@ -374,7 +392,7 @@ Scripts/live_smoke.sh
 Build the UPM archive for a GitHub release attachment:
 
 ```bash
-Scripts/package_release.sh 1.1.0
+Scripts/package_release.sh 1.2.0
 ```
 
 Release slotInfo lives in `UPM_RELEASE.md`.

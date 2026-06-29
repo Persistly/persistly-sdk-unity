@@ -578,7 +578,7 @@ namespace Persistly.Unity
             var client = new PersistlyClient(new PersistlyClientOptions(settings.BaseUrl, settings.RuntimeKey.Trim())
             {
                 Transport = settings.Transport,
-                UserAgent = "Persistly Unity SDK/1.1.0"
+                UserAgent = "Persistly Unity SDK/1.2.0"
             });
 
             _shared = new PersistlyGameSaves(settings, client, store, localAccountKey, account);
@@ -735,6 +735,64 @@ namespace Persistly.Unity
             var result = await _client.CreateAuthSessionAsync(request, CurrentAccountIdOrNull(), CurrentAccountSessionTokenOrNull(), cancellationToken);
             ApplyAuthSessionResult(result);
             return result;
+        }
+
+        public Task<PersistlyAuthSessionResult> ConnectWithFirebaseTokenAsync(
+            string firebaseIdToken,
+            PersistlyAuthOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(firebaseIdToken))
+            {
+                throw new PersistlyConfigurationError("connect_firebase_invalid_input: ConnectWithFirebaseTokenAsync requires a non-empty firebaseIdToken.");
+            }
+
+            var request = new PersistlyProviderSignInRequest(PersistlyAuthProvider.Firebase, firebaseIdToken)
+            {
+                DeviceLabel = options?.DeviceLabel
+            };
+            return ConnectProviderAsync(request, cancellationToken);
+        }
+
+        public Task<PersistlyAuthSessionResult> ConnectWithSupabaseTokenAsync(
+            string supabaseAccessToken,
+            PersistlyAuthOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(supabaseAccessToken))
+            {
+                throw new PersistlyConfigurationError("connect_supabase_invalid_input: ConnectWithSupabaseTokenAsync requires a non-empty supabaseAccessToken.");
+            }
+
+            var request = new PersistlyProviderSignInRequest(PersistlyAuthProvider.Supabase, supabaseAccessToken)
+            {
+                DeviceLabel = options?.DeviceLabel
+            };
+            return ConnectProviderAsync(request, cancellationToken);
+        }
+
+        public Task<PersistlyAuthSessionResult> ConnectWithAuth0TokenAsync(
+            string auth0Token,
+            PersistlyAuthOptions? options = null,
+            CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(auth0Token))
+            {
+                throw new PersistlyConfigurationError("connect_auth0_invalid_input: ConnectWithAuth0TokenAsync requires a non-empty auth0Token.");
+            }
+
+            var request = new PersistlyProviderSignInRequest(PersistlyAuthProvider.Auth0, auth0Token)
+            {
+                DeviceLabel = options?.DeviceLabel
+            };
+            return ConnectProviderAsync(request, cancellationToken);
+        }
+
+        public Task<PersistlyAuthSessionResult> ConnectProviderAsync(
+            PersistlyProviderSignInRequest request,
+            CancellationToken cancellationToken = default)
+        {
+            return LinkProviderAsync(request, cancellationToken);
         }
 
         public async Task<PersistlyAuthSessionResult> LinkProviderAsync(
