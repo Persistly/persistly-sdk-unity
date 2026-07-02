@@ -165,7 +165,7 @@ await PersistlyGameSaves.Shared.ConnectWithSupabaseTokenAsync(supabaseAccessToke
 await PersistlyGameSaves.Shared.ConnectWithAuth0TokenAsync(auth0Token);
 ```
 
-If the provider is already linked to another Persistly account, connect-later returns `account_auth_conflict` as `PersistlyAccountAuthConflictError` and preserves the current local anonymous progress. Do not automatically clear local data or switch accounts; show both choices in your game UI and continue saving locally until the player confirms.
+If the provider is already linked to another Persistly account, connect-later returns `account_auth_conflict` as `PersistlyAccountAuthConflictError` and preserves the current local anonymous progress. Do not merge, copy, import, overwrite, or replace the active account automatically. Safe choices are: keep local progress and continue playing, sign out of the provider and choose a different provider account, or explicitly discard local Persistly state on this device and sign into the existing provider-linked cloud account.
 
 Lower-level provider sign-in and provider linking are available for Firebase, Supabase, and Auth0:
 

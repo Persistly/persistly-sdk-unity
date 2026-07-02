@@ -50,9 +50,10 @@ namespace Persistly.Templates.AnonymousFirstConnectLater
             }
         }
 
-        public async Task SwitchToProviderAccountAsync(string firebaseIdToken)
+        public async Task DiscardLocalAndUseProviderAccountAsync(string firebaseIdToken)
         {
-            // Only call this after the player confirms replacing this device's local progress.
+            // Only call this after the player confirms discarding this device's local Persistly state.
+            // This does not copy anonymous progress into the provider-linked cloud account.
             await PersistlyGameSaves.Shared.ClearLocalAccountAsync();
             await PersistlyGameSaves.Shared.SignInWithFirebaseTokenAsync(firebaseIdToken, new PersistlyAuthOptions
             {

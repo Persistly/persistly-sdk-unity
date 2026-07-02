@@ -24,7 +24,10 @@ public sealed class UsageExample : MonoBehaviour
         if (!connected)
         {
             // account_auth_conflict means local anonymous progress is still present.
-            // Only switch after confirmation.
+            // Safe options are:
+            // - keep local progress and continue playing
+            // - sign out of Firebase, choose a different Firebase account, then retry ConnectFirebaseAsync()
+            // - discard local Persistly state and use the existing provider-linked cloud account
         }
     }
 }
