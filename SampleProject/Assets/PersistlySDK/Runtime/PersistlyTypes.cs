@@ -43,11 +43,11 @@ namespace Persistly.Unity
 
         public int TimeoutSeconds { get; set; } = 30;
 
-        public string UserAgent { get; set; } = "Persistly Unity SDK/1.2.0";
+        public string UserAgent { get; set; } = "Persistly Unity SDK/1.3.0";
 
         public string SdkName { get; set; } = "unity";
 
-        public string SdkVersion { get; set; } = "1.2.0";
+        public string SdkVersion { get; set; } = "1.3.0";
 
         public string Platform { get; set; } = "unity";
 

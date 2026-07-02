@@ -21,7 +21,7 @@ The recommended Unity flow is facade-first:
 5. Optional auth bridge helpers can exchange Firebase ID tokens, Supabase access tokens, or Auth0 ID/access tokens for a Persistly account session.
 6. Use `PersistlyClient` directly only for advanced runtime API access.
 
-This package is `1.2.0` and pins `persistly-contract-v0.4.0`.
+This package is `1.3.0` and pins `persistly-contract-v0.4.0`.
 
 ## Install
 
@@ -34,7 +34,7 @@ https://github.com/Persistly/persistly-sdk-unity.git?path=/
 For the stable release tag:
 
 ```text
-https://github.com/Persistly/persistly-sdk-unity.git#v1.2.0
+https://github.com/Persistly/persistly-sdk-unity.git#v1.3.0
 ```
 
 In Unity, open Package Manager, choose **Add package from git URL**, paste the URL, then configure a `ps_test_...` or `ps_live_...` runtime key in your game code or inspector.
@@ -392,7 +392,7 @@ Scripts/live_smoke.sh
 Build the UPM archive for a GitHub release attachment:
 
 ```bash
-Scripts/package_release.sh 1.2.0
+Scripts/package_release.sh 1.3.0
 ```
 
 Release slotInfo lives in `UPM_RELEASE.md`.

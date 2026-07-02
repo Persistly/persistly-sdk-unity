@@ -1,6 +1,6 @@
 {
   "name": "com.persistly.sdk.unity",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "displayName": "Persistly Unity SDK",
   "description": "Unity SDK and playable sample project for Persistly account saves, sessions, and slot sync.",
   "license": "Apache-2.0",

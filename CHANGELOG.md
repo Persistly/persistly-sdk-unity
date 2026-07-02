@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.3.0
+
+- Clarifies anonymous-first Auth Bridge conflict handling for Firebase, Supabase, and Auth0 connect-later flows.
+- Updates examples and templates to show that `PersistlyAccountAuthConflictError` preserves current local progress.
+- Documents the safe player choices when a provider identity already belongs to another Persistly account: keep local progress, retry with another provider account, or explicitly discard local state before using the provider-linked account.
+
 ## 1.2.0
 
 - Adds explicit connect-later helpers for anonymous-first games: `ConnectWithFirebaseTokenAsync`, `ConnectWithSupabaseTokenAsync`, `ConnectWithAuth0TokenAsync`, and `ConnectProviderAsync`.
