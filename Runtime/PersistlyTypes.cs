@@ -456,6 +456,44 @@ namespace Persistly.Unity
         public PersistlyRuntimeGameConfig? GameConfig { get; }
     }
 
+    public sealed class PersistlyWalletClientBalance
+    {
+        public PersistlyWalletClientBalance(string currencyCode, string displayName, string currencyType, long balance, string updatedAt)
+        {
+            CurrencyCode = currencyCode;
+            DisplayName = displayName;
+            CurrencyType = currencyType;
+            Balance = balance;
+            UpdatedAt = updatedAt;
+        }
+
+        public string CurrencyCode { get; }
+
+        public string DisplayName { get; }
+
+        public string CurrencyType { get; }
+
+        public long Balance { get; }
+
+        public string UpdatedAt { get; }
+    }
+
+    public sealed class PersistlyWalletBalancesResult
+    {
+        public PersistlyWalletBalancesResult(string accountId, string environment, IReadOnlyList<PersistlyWalletClientBalance> balances)
+        {
+            AccountId = accountId;
+            Environment = environment;
+            Balances = balances;
+        }
+
+        public string AccountId { get; }
+
+        public string Environment { get; }
+
+        public IReadOnlyList<PersistlyWalletClientBalance> Balances { get; }
+    }
+
     public sealed class PersistlyRuntimeGameConfig
     {
         public PersistlyRuntimeGameConfig(

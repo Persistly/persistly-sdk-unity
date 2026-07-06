@@ -610,6 +610,24 @@ namespace Persistly.Unity
             }
         }
 
+        public async Task<PersistlyWalletBalancesResult> GetWalletBalancesAsync(CancellationToken cancellationToken = default)
+        {
+            string accountId;
+            string accountSessionToken;
+            lock (_gate)
+            {
+                if (string.IsNullOrWhiteSpace(_account.AccountId) || string.IsNullOrWhiteSpace(_account.AccountSessionToken))
+                {
+                    throw new PersistlyConfigurationError("get_wallet_balances requires accountId and accountSessionToken.");
+                }
+
+                accountId = _account.AccountId!;
+                accountSessionToken = _account.AccountSessionToken!;
+            }
+
+            return await _client.GetWalletBalancesAsync(accountId, accountSessionToken, cancellationToken);
+        }
+
         public async Task<PersistlyGameSaveResult> CreateAccountAsync(CancellationToken cancellationToken = default)
         {
             await AssertNoExistingLocalAccountStateAsync("create_account_local_state_exists: Call ClearLocalAccountAsync before creating a different account.");

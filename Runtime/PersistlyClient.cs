@@ -438,6 +438,24 @@ namespace Persistly.Unity
             return ParseRuntimeConfig(response.Body);
         }
 
+        public async Task<PersistlyWalletBalancesResult> GetWalletBalancesAsync(
+            string accountId,
+            string accountSessionToken,
+            CancellationToken cancellationToken = default)
+        {
+            EnsureRuntimeId(accountId);
+            EnsureSessionToken(accountSessionToken);
+            var response = await SendJsonAsync(
+                "GET",
+                "/api/v1/secure/wallet/balances",
+                null,
+                cancellationToken,
+                accountId: accountId,
+                accountSessionToken: accountSessionToken);
+
+            return ParseWalletBalancesResult(response.Body);
+        }
+
         public async Task<PersistlySyncResponse> SyncAccountDataAsync(
             string accountId,
             string accountSessionToken,
@@ -833,6 +851,37 @@ namespace Persistly.Unity
             }
 
             return new PersistlyRuntimeConfig(ParseSyncPolicy(policy), gameConfig);
+        }
+
+        private static PersistlyWalletBalancesResult ParseWalletBalancesResult(string body)
+        {
+            var root = AsObject(PersistlyJson.ParseJsonValue(body, "wallet balances"), "wallet balances");
+            var accountId = GetRequiredString(root, "accountId", "wallet balances");
+            var environment = GetRequiredString(root, "environment", "wallet balances");
+            var balancesRoot = root["balances"] as List<object?>;
+            if (balancesRoot == null)
+            {
+                throw new PersistlyConfigurationError("wallet balances response balances must be an array.");
+            }
+
+            var balances = new List<PersistlyWalletClientBalance>(balancesRoot.Count);
+            foreach (var item in balancesRoot)
+            {
+                var balanceRoot = item as Dictionary<string, object?>;
+                if (balanceRoot == null)
+                {
+                    throw new PersistlyConfigurationError("wallet balances entries must be JSON objects.");
+                }
+
+                balances.Add(new PersistlyWalletClientBalance(
+                    GetRequiredString(balanceRoot, "currencyCode", "wallet balance"),
+                    GetRequiredString(balanceRoot, "displayName", "wallet balance"),
+                    GetRequiredString(balanceRoot, "currencyType", "wallet balance"),
+                    GetRequiredInt(balanceRoot, "balance", "wallet balance"),
+                    GetRequiredString(balanceRoot, "updatedAt", "wallet balance")));
+            }
+
+            return new PersistlyWalletBalancesResult(accountId, environment, balances);
         }
 
         private static PersistlyRuntimeGameConfig ParseRuntimeGameConfig(Dictionary<string, object?> gameConfig)
